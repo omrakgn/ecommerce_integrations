@@ -17,6 +17,7 @@ from ecommerce_integrations.shopify import connection
 from ecommerce_integrations.shopify.constants import (
 	ADDRESS_ID_FIELD,
 	CUSTOMER_ID_FIELD,
+	DISCOUNT_CODES_FIELD,
 	FULLFILLMENT_ID_FIELD,
 	ITEM_SELLING_RATE_FIELD,
 	ORDER_ID_FIELD,
@@ -170,6 +171,15 @@ def setup_custom_fields():
 				insert_after=ORDER_NUMBER_FIELD,
 				read_only=1,
 				print_hide=1,
+			),
+			dict(
+				fieldname=DISCOUNT_CODES_FIELD,
+				label="Shopify Discount Codes",
+				fieldtype="Small Text",
+				insert_after=ORDER_STATUS_FIELD,
+				read_only=1,
+				print_hide=1,
+				description="Comma-separated list of discount codes used in this order",
 			),
 		],
 		"Sales Order Item": [

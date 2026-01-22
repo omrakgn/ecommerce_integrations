@@ -10,6 +10,7 @@ from shopify.resources import Order
 from ecommerce_integrations.shopify.connection import temp_shopify_session
 from ecommerce_integrations.shopify.constants import (
 	CUSTOMER_ID_FIELD,
+	DISCOUNT_CODES_FIELD,
 	EVENT_MAPPER,
 	ORDER_ID_FIELD,
 	ORDER_ITEM_DISCOUNT_FIELD,
@@ -102,23 +103,52 @@ def create_sales_order(shopify_order, setting, company=None):
 			return ""
 
 		taxes = get_order_taxes(shopify_order, setting, items)
-		so = frappe.get_doc(
-			{
-				"doctype": "Sales Order",
-				"naming_series": setting.sales_order_series or "SO-Shopify-",
-				ORDER_ID_FIELD: str(shopify_order.get("id")),
-				ORDER_NUMBER_FIELD: shopify_order.get("name"),
-				"customer": customer,
-				"transaction_date": getdate(shopify_order.get("created_at")) or nowdate(),
-				"delivery_date": getdate(shopify_order.get("created_at")) or nowdate(),
-				"company": setting.company,
-				"selling_price_list": get_dummy_price_list(),
-				"ignore_pricing_rule": 1,
-				"items": items,
-				"taxes": taxes,
-				"tax_category": get_dummy_tax_category(),
-			}
-		)
+		
+		# Get discount information
+		discount_info = get_discount_info(shopify_order)
+		
+		# Get Sales Partner from mapping
+		sales_partner_info = get_sales_partner_from_mapping(shopify_order, setting)
+		
+		# Build Sales Order document
+		so_data = {
+			"doctype": "Sales Order",
+			"naming_series": setting.sales_order_series or "SO-Shopify-",
+			ORDER_ID_FIELD: str(shopify_order.get("id")),
+			ORDER_NUMBER_FIELD: shopify_order.get("name"),
+			"customer": customer,
+			"transaction_date": getdate(shopify_order.get("created_at")) or nowdate(),
+			"delivery_date": getdate(shopify_order.get("created_at")) or nowdate(),
+			"company": setting.company,
+			"cost_center": setting.cost_center,
+			"po_no": shopify_order.get("name"),
+			"po_date": getdate(shopify_order.get("created_at")) or nowdate(),
+			"selling_price_list": get_dummy_price_list(),
+			"items": items,
+			"taxes": taxes,
+			"tax_category": get_dummy_tax_category(),
+			DISCOUNT_CODES_FIELD: discount_info.get("codes"),
+		}
+		
+		# Hybrid discount approach:
+		# If coupon exists in ERPNext, use native coupon_code (Pricing Rule will apply)
+		# Otherwise, use additional_discount_percentage as fallback
+		if discount_info.get("use_native_coupon"):
+			so_data["coupon_code"] = discount_info.get("coupon_code")
+			so_data["ignore_pricing_rule"] = 0  # Let Pricing Rule apply the discount
+		else:
+			so_data["ignore_pricing_rule"] = 1
+			if discount_info.get("percentage"):
+				so_data["apply_discount_on"] = "Grand Total"
+				so_data["additional_discount_percentage"] = discount_info.get("percentage")
+		
+		so = frappe.get_doc(so_data)
+		
+		# Add Sales Partner if found
+		if sales_partner_info:
+			so.sales_partner = sales_partner_info.get("sales_partner")
+			if sales_partner_info.get("commission_rate"):
+				so.commission_rate = sales_partner_info.get("commission_rate")
 
 		if company:
 			so.update({"company": company, "status": "Draft"})
@@ -160,6 +190,7 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 					"qty": shopify_item.get("quantity"),
 					"stock_uom": shopify_item.get("uom") or "Nos",
 					"warehouse": setting.warehouse,
+					"cost_center": setting.cost_center,
 					ORDER_ITEM_DISCOUNT_FIELD: (
 						_get_total_discount(shopify_item) / cint(shopify_item.get("quantity"))
 					),
@@ -172,20 +203,23 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 
 
 def _get_item_price(line_item, taxes_inclusive: bool) -> float:
+	"""Get item price WITHOUT discount deduction.
+	
+	Discount will be applied at order level using additional_discount_percentage.
+	This ensures discounts are visible on invoices.
+	"""
 	price = flt(line_item.get("price"))
 	qty = cint(line_item.get("quantity"))
 
-	# remove line item level discounts
-	total_discount = _get_total_discount(line_item)
-
 	if not taxes_inclusive:
-		return price - (total_discount / qty)
+		return price
 
+	# Only remove taxes if taxes are inclusive, NOT discounts
 	total_taxes = 0.0
 	for tax in line_item.get("tax_lines"):
 		total_taxes += flt(tax.get("price"))
 
-	return price - (total_taxes + total_discount) / qty
+	return price - (total_taxes / qty)
 
 
 def _get_total_discount(line_item) -> float:
@@ -433,3 +467,126 @@ def _fetch_old_orders(from_time, to_time):
 			# Using generator instead of fetching all at once is better for
 			# avoiding rate limits and reducing resource usage.
 			yield order.to_dict()
+
+
+def get_discount_info(shopify_order: dict) -> dict:
+	"""Extract discount codes and percentage from Shopify order.
+	
+	Hybrid approach:
+	- If coupon code exists in ERPNext, use native coupon_code field
+	- Otherwise, fallback to additional_discount_percentage
+	
+	Returns:
+		dict: {
+			"codes": "CODE1, CODE2" (comma-separated string for custom field),
+			"percentage": 5.0 (float, for fallback),
+			"coupon_code": "CODE1" or None (ERPNext native coupon if exists),
+			"use_native_coupon": True/False
+		}
+	"""
+	discount_codes = shopify_order.get("discount_codes") or []
+	discount_applications = shopify_order.get("discount_applications") or []
+	
+	# Extract all discount codes (comma-separated)
+	code_list = [dc.get("code", "") for dc in discount_codes if dc.get("code")]
+	codes = ", ".join(code_list)
+	
+	# Extract discount percentage from discount_applications
+	percentage = 0.0
+	for app in discount_applications:
+		if app.get("value_type") == "percentage":
+			percentage += flt(app.get("value", 0))
+	
+	# Check if any coupon code exists in ERPNext
+	erpnext_coupon = None
+	for code in code_list:
+		if frappe.db.exists("Coupon Code", {"coupon_code": code}):
+			erpnext_coupon = code
+			break
+	
+	return {
+		"codes": codes,
+		"percentage": percentage,
+		"coupon_code": erpnext_coupon,
+		"use_native_coupon": bool(erpnext_coupon),
+	}
+
+
+def get_sales_partner_from_mapping(shopify_order: dict, setting) -> dict | None:
+	"""Find Sales Partner based on discount codes or referral/UTM parameters.
+	
+	Priority:
+		1. First check discount codes
+		2. Then check landing_site for referral/UTM parameters
+		3. Then check referring_site
+	
+	Returns:
+		dict: {"sales_partner": "Partner Name", "commission_rate": 5.0} or None
+	"""
+	if not cint(setting.enable_sales_partner_mapping):
+		return None
+	
+	mappings = setting.sales_partner_mapping or []
+	if not mappings:
+		return None
+	
+	# Build lookup dictionaries for faster matching
+	discount_code_mappings = {}
+	referral_mappings = {}
+	
+	for m in mappings:
+		if m.mapping_type == "Discount Code":
+			# Store lowercase for case-insensitive matching
+			discount_code_mappings[m.mapping_value.lower()] = {
+				"sales_partner": m.sales_partner,
+				"commission_rate": m.commission_rate,
+			}
+		elif m.mapping_type == "Referral/UTM":
+			referral_mappings[m.mapping_value.lower()] = {
+				"sales_partner": m.sales_partner,
+				"commission_rate": m.commission_rate,
+			}
+	
+	# 1. Check discount codes first
+	discount_codes = shopify_order.get("discount_codes") or []
+	for dc in discount_codes:
+		code = (dc.get("code") or "").lower()
+		if code and code in discount_code_mappings:
+			return discount_code_mappings[code]
+	
+	# 2. Check landing_site for referral/UTM parameters
+	landing_site = shopify_order.get("landing_site") or ""
+	if landing_site:
+		partner = _match_referral_pattern(landing_site, referral_mappings)
+		if partner:
+			return partner
+	
+	# 3. Check referring_site
+	referring_site = shopify_order.get("referring_site") or ""
+	if referring_site:
+		partner = _match_referral_pattern(referring_site, referral_mappings)
+		if partner:
+			return partner
+	
+	return None
+
+
+def _match_referral_pattern(url: str, referral_mappings: dict) -> dict | None:
+	"""Match URL against referral/UTM patterns.
+	
+	Args:
+		url: The landing_site or referring_site URL
+		referral_mappings: Dict of pattern -> partner info
+	
+	Returns:
+		Partner info dict or None
+	"""
+	url_lower = url.lower()
+	
+	for pattern, partner_info in referral_mappings.items():
+		# Check if pattern exists anywhere in the URL
+		# This handles both query params (ref=PARTNER) and path-based refs
+		if pattern in url_lower:
+			return partner_info
+	
+	return None

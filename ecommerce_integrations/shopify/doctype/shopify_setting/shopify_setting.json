@@ -58,7 +58,10 @@
   "old_orders_from",
   "old_orders_to",
   "is_old_data_migrated",
-  "last_inventory_sync"
+  "last_inventory_sync",
+  "sales_partner_section",
+  "enable_sales_partner_mapping",
+  "sales_partner_mapping"
  ],
  "fields": [
   {
@@ -387,6 +390,26 @@
    "fieldtype": "Link",
    "label": "Default Shipping Charges Account",
    "options": "Account"
+  },
+  {
+   "fieldname": "sales_partner_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Partner Mapping"
+  },
+  {
+   "default": "0",
+   "description": "Enable automatic Sales Partner assignment based on discount codes or referral links",
+   "fieldname": "enable_sales_partner_mapping",
+   "fieldtype": "Check",
+   "label": "Enable Sales Partner Mapping"
+  },
+  {
+   "depends_on": "eval:doc.enable_sales_partner_mapping",
+   "description": "Map discount codes or referral/UTM parameters to Sales Partners",
+   "fieldname": "sales_partner_mapping",
+   "fieldtype": "Table",
+   "label": "Sales Partner Mapping",
+   "options": "Shopify Sales Partner Mapping"
   }
  ],
  "index_web_pages_for_search": 1,
