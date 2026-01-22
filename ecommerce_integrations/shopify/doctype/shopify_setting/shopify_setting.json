@@ -40,6 +40,8 @@
   "default_sales_tax_account",
   "column_break_qibo",
   "default_shipping_charges_account",
+  "payment_gateway_section",
+  "payment_gateway_mapping",
   "erpnext_to_shopify_sync_section",
   "upload_erpnext_items",
   "update_shopify_item_on_update",
@@ -234,6 +236,18 @@
    "label": "Shopify Tax Account",
    "mandatory_depends_on": "eval:doc.enable_shopify",
    "options": "Shopify Tax Account"
+  },
+  {
+   "fieldname": "payment_gateway_section",
+   "fieldtype": "Section Break",
+   "label": "Payment Gateway Mapping"
+  },
+  {
+   "description": "Map Shopify payment gateways (Klarna, PayPal, etc.) to ERPNext Mode of Payment. This is used when creating Payment Entry.",
+   "fieldname": "payment_gateway_mapping",
+   "fieldtype": "Table",
+   "label": "Payment Gateway Mapping",
+   "options": "Shopify Payment Gateway Mapping"
   },
   {
    "fieldname": "erpnext_to_shopify_sync_section",

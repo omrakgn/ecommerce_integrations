@@ -16,6 +16,7 @@ from ecommerce_integrations.shopify.constants import (
 	ORDER_ITEM_DISCOUNT_FIELD,
 	ORDER_NUMBER_FIELD,
 	ORDER_STATUS_FIELD,
+	PAYMENT_METHOD_FIELD,
 	SETTING_DOCTYPE,
 )
 from ecommerce_integrations.shopify.customer import ShopifyCustomer
@@ -110,6 +111,10 @@ def create_sales_order(shopify_order, setting, company=None):
 		# Get Sales Partner from mapping
 		sales_partner_info = get_sales_partner_from_mapping(shopify_order, setting)
 		
+		# Get payment method
+		payment_gateway_names = shopify_order.get("payment_gateway_names") or []
+		payment_method = ", ".join(payment_gateway_names) if payment_gateway_names else ""
+		
 		# Build Sales Order document
 		so_data = {
 			"doctype": "Sales Order",
@@ -128,6 +133,7 @@ def create_sales_order(shopify_order, setting, company=None):
 			"taxes": taxes,
 			"tax_category": get_dummy_tax_category(),
 			DISCOUNT_CODES_FIELD: discount_info.get("codes"),
+			PAYMENT_METHOD_FIELD: payment_method,
 		}
 		
 		# Hybrid discount approach:

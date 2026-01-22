@@ -24,6 +24,7 @@ from ecommerce_integrations.shopify.constants import (
 	ORDER_ITEM_DISCOUNT_FIELD,
 	ORDER_NUMBER_FIELD,
 	ORDER_STATUS_FIELD,
+	PAYMENT_METHOD_FIELD,
 	SUPPLIER_ID_FIELD,
 )
 from ecommerce_integrations.shopify.utils import (
@@ -180,6 +181,15 @@ def setup_custom_fields():
 				read_only=1,
 				print_hide=1,
 				description="Comma-separated list of discount codes used in this order",
+			),
+			dict(
+				fieldname=PAYMENT_METHOD_FIELD,
+				label="Shopify Payment Method",
+				fieldtype="Small Text",
+				insert_after=DISCOUNT_CODES_FIELD,
+				read_only=1,
+				print_hide=1,
+				description="Payment gateway used for this order (e.g., Klarna, PayPal, Stripe)",
 			),
 		],
 		"Sales Order Item": [

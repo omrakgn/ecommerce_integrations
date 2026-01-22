@@ -51,7 +51,9 @@ def create_sales_invoice(shopify_order, setting, so):
 		sales_invoice.insert(ignore_mandatory=True)
 		sales_invoice.submit()
 		if sales_invoice.grand_total > 0:
-			make_payament_entry_against_sales_invoice(sales_invoice, setting, posting_date)
+			# Get payment method from Shopify order
+			payment_gateway = get_payment_gateway(shopify_order)
+			make_payment_entry_against_sales_invoice(sales_invoice, setting, posting_date, payment_gateway)
 
 		if shopify_order.get("note"):
 			sales_invoice.add_comment(text=f"Order Note: {shopify_order.get('note')}")
@@ -62,7 +64,40 @@ def set_cost_center(items, cost_center):
 		item.cost_center = cost_center
 
 
-def make_payament_entry_against_sales_invoice(doc, setting, posting_date=None):
+def get_payment_gateway(shopify_order) -> str:
+	"""Extract payment gateway name from Shopify order."""
+	payment_gateway_names = shopify_order.get("payment_gateway_names") or []
+	if payment_gateway_names:
+		return payment_gateway_names[0]  # Primary payment method
+	return ""
+
+
+def get_mode_of_payment(payment_gateway: str, setting) -> str | None:
+	"""Get ERPNext Mode of Payment based on Shopify payment gateway.
+	
+	First checks Shopify Payment Gateway Mapping in settings.
+	Falls back to finding Mode of Payment with same name.
+	"""
+	if not payment_gateway:
+		return None
+	
+	# Check if there's a mapping in Shopify Settings
+	if hasattr(setting, 'payment_gateway_mapping') and setting.payment_gateway_mapping:
+		for mapping in setting.payment_gateway_mapping:
+			if mapping.shopify_payment_gateway.lower() == payment_gateway.lower():
+				return mapping.mode_of_payment
+	
+	# Fallback: Check if Mode of Payment exists with same/similar name
+	mode_of_payment = frappe.db.get_value(
+		"Mode of Payment",
+		{"name": ("like", f"%{payment_gateway}%")},
+		"name"
+	)
+	
+	return mode_of_payment
+
+
+def make_payment_entry_against_sales_invoice(doc, setting, posting_date=None, payment_gateway=None):
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
 	payment_entry = get_payment_entry(doc.doctype, doc.name, bank_account=setting.cash_bank_account)
@@ -70,5 +105,12 @@ def make_payament_entry_against_sales_invoice(doc, setting, posting_date=None):
 	payment_entry.reference_no = doc.name
 	payment_entry.posting_date = posting_date or nowdate()
 	payment_entry.reference_date = posting_date or nowdate()
+	
+	# Set Mode of Payment if available
+	if payment_gateway:
+		mode_of_payment = get_mode_of_payment(payment_gateway, setting)
+		if mode_of_payment:
+			payment_entry.mode_of_payment = mode_of_payment
+	
 	payment_entry.insert(ignore_permissions=True)
 	payment_entry.submit()
