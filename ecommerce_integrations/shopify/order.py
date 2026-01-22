@@ -138,15 +138,19 @@ def create_sales_order(shopify_order, setting, company=None):
 		
 		# Hybrid discount approach:
 		# If coupon exists in ERPNext, use native coupon_code (Pricing Rule will apply)
-		# Otherwise, use additional_discount_percentage as fallback
+		# Otherwise, use additional_discount_percentage or discount_amount as fallback
 		if discount_info.get("use_native_coupon"):
 			so_data["coupon_code"] = discount_info.get("coupon_code")
 			so_data["ignore_pricing_rule"] = 0  # Let Pricing Rule apply the discount
 		else:
 			so_data["ignore_pricing_rule"] = 1
+			so_data["apply_discount_on"] = "Grand Total"
+			
+			# Prefer percentage discount, fallback to fixed amount
 			if discount_info.get("percentage"):
-				so_data["apply_discount_on"] = "Grand Total"
 				so_data["additional_discount_percentage"] = discount_info.get("percentage")
+			elif discount_info.get("amount"):
+				so_data["discount_amount"] = discount_info.get("amount")
 		
 		so = frappe.get_doc(so_data)
 		
@@ -476,16 +480,17 @@ def _fetch_old_orders(from_time, to_time):
 
 
 def get_discount_info(shopify_order: dict) -> dict:
-	"""Extract discount codes and percentage from Shopify order.
+	"""Extract discount codes and percentage/amount from Shopify order.
 	
 	Hybrid approach:
 	- If coupon code exists in ERPNext, use native coupon_code field
-	- Otherwise, fallback to additional_discount_percentage
+	- Otherwise, fallback to additional_discount_percentage or discount_amount
 	
 	Returns:
 		dict: {
 			"codes": "CODE1, CODE2" (comma-separated string for custom field),
-			"percentage": 5.0 (float, for fallback),
+			"percentage": 5.0 (float, for percentage discounts),
+			"amount": 10.0 (float, for fixed amount discounts),
 			"coupon_code": "CODE1" or None (ERPNext native coupon if exists),
 			"use_native_coupon": True/False
 		}
@@ -497,11 +502,32 @@ def get_discount_info(shopify_order: dict) -> dict:
 	code_list = [dc.get("code", "") for dc in discount_codes if dc.get("code")]
 	codes = ", ".join(code_list)
 	
-	# Extract discount percentage from discount_applications
+	# Extract discount percentage and fixed amount from discount_applications
 	percentage = 0.0
+	fixed_amount = 0.0
+	
 	for app in discount_applications:
-		if app.get("value_type") == "percentage":
-			percentage += flt(app.get("value", 0))
+		value_type = app.get("value_type")
+		value = flt(app.get("value", 0))
+		
+		if value_type == "percentage":
+			percentage += value
+		elif value_type == "fixed_amount":
+			fixed_amount += value
+	
+	# If no percentage from applications, calculate from discount_codes (fallback)
+	if not percentage and not fixed_amount and discount_codes:
+		# discount_codes has the actual amount applied
+		for dc in discount_codes:
+			dc_type = dc.get("type")
+			dc_amount = flt(dc.get("amount", 0))
+			
+			if dc_type == "percentage":
+				# We need to calculate percentage from amount
+				# This is a fallback, discount_applications is more reliable
+				pass
+			elif dc_type == "fixed_amount" or dc_amount > 0:
+				fixed_amount += dc_amount
 	
 	# Check if any coupon code exists in ERPNext
 	erpnext_coupon = None
@@ -513,6 +539,7 @@ def get_discount_info(shopify_order: dict) -> dict:
 	return {
 		"codes": codes,
 		"percentage": percentage,
+		"amount": fixed_amount,
 		"coupon_code": erpnext_coupon,
 		"use_native_coupon": bool(erpnext_coupon),
 	}
