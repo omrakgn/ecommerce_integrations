@@ -126,6 +126,7 @@ def create_sales_order(shopify_order, setting, company=None):
 			"delivery_date": getdate(shopify_order.get("created_at")) or nowdate(),
 			"company": setting.company,
 			"cost_center": setting.cost_center,
+			"set_warehouse": setting.warehouse,
 			"po_no": shopify_order.get("name"),
 			"po_date": getdate(shopify_order.get("created_at")) or nowdate(),
 			"selling_price_list": get_dummy_price_list(),
