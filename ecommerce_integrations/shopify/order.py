@@ -137,21 +137,13 @@ def create_sales_order(shopify_order, setting, company=None):
 			PAYMENT_METHOD_FIELD: payment_method,
 		}
 		
-		# Hybrid discount approach:
-		# If coupon exists in ERPNext, use native coupon_code (Pricing Rule will apply)
-		# Otherwise, use additional_discount_percentage or discount_amount as fallback
+		# Discount is applied at item level (discount_percentage in each item)
+		# Just track coupon code if exists in ERPNext
 		if discount_info.get("use_native_coupon"):
 			so_data["coupon_code"] = discount_info.get("coupon_code")
-			so_data["ignore_pricing_rule"] = 0  # Let Pricing Rule apply the discount
+			so_data["ignore_pricing_rule"] = 0
 		else:
 			so_data["ignore_pricing_rule"] = 1
-			so_data["apply_discount_on"] = "Grand Total"
-			
-			# Prefer percentage discount, fallback to fixed amount
-			if discount_info.get("percentage"):
-				so_data["additional_discount_percentage"] = discount_info.get("percentage")
-			elif discount_info.get("amount"):
-				so_data["discount_amount"] = discount_info.get("amount")
 		
 		so = frappe.get_doc(so_data)
 		
@@ -192,19 +184,30 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 
 		if all_product_exists:
 			item_code = get_item_code(shopify_item)
+			
+			# Get original price (tax-inclusive from Shopify)
+			original_price = flt(shopify_item.get("price"))
+			qty = cint(shopify_item.get("quantity"))
+			
+			# Get discount amount and calculate discount percentage
+			discount_amount = _get_total_discount(shopify_item)
+			discount_percentage = 0.0
+			if original_price > 0 and discount_amount > 0:
+				discount_percentage = (discount_amount / qty) / original_price * 100
+			
 			items.append(
 				{
 					"item_code": item_code,
 					"item_name": shopify_item.get("name"),
-					"rate": _get_item_price(shopify_item, taxes_inclusive),
+					"price_list_rate": original_price,  # Original price (tax-inclusive)
+					"discount_percentage": discount_percentage,  # Discount %
+					"rate": original_price - (discount_amount / qty),  # Discounted price (tax-inclusive)
 					"delivery_date": delivery_date,
-					"qty": shopify_item.get("quantity"),
+					"qty": qty,
 					"stock_uom": shopify_item.get("uom") or "Nos",
 					"warehouse": setting.warehouse,
 					"cost_center": setting.cost_center,
-					ORDER_ITEM_DISCOUNT_FIELD: (
-						_get_total_discount(shopify_item) / cint(shopify_item.get("quantity"))
-					),
+					ORDER_ITEM_DISCOUNT_FIELD: discount_amount / qty,
 				}
 			)
 		else:
@@ -214,23 +217,16 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 
 
 def _get_item_price(line_item, taxes_inclusive: bool) -> float:
-	"""Get item price WITHOUT discount deduction.
+	"""Get item price (tax-inclusive, after discount).
 	
-	Discount will be applied at order level using additional_discount_percentage.
-	This ensures discounts are visible on invoices.
+	Returns the discounted price including tax, as shown in Shopify.
 	"""
-	price = flt(line_item.get("price"))
+	price = flt(line_item.get("price"))  # Original price (tax-inclusive)
 	qty = cint(line_item.get("quantity"))
-
-	if not taxes_inclusive:
-		return price
-
-	# Only remove taxes if taxes are inclusive, NOT discounts
-	total_taxes = 0.0
-	for tax in line_item.get("tax_lines"):
-		total_taxes += flt(tax.get("price"))
-
-	return price - (total_taxes / qty)
+	discount_amount = _get_total_discount(line_item)
+	
+	# Return discounted price (tax-inclusive)
+	return price - (discount_amount / qty)
 
 
 def _get_total_discount(line_item) -> float:
@@ -241,6 +237,7 @@ def _get_total_discount(line_item) -> float:
 def get_order_taxes(shopify_order, setting, items):
 	taxes = []
 	line_items = shopify_order.get("line_items")
+	taxes_inclusive = shopify_order.get("taxes_included", False)
 
 	for line_item in line_items:
 		item_code = get_item_code(line_item)
@@ -254,7 +251,7 @@ def get_order_taxes(shopify_order, setting, items):
 						or f"{tax.get('title')} - {tax.get('rate') * 100.0:.2f}%"
 					),
 					"tax_amount": tax.get("price"),
-					"included_in_print_rate": 0,
+					"included_in_print_rate": 1 if taxes_inclusive else 0,  # Mark as inclusive if prices include tax
 					"cost_center": setting.cost_center,
 					"item_wise_tax_detail": {item_code: [flt(tax.get("rate")) * 100, flt(tax.get("price"))]},
 					"dont_recompute_tax": 1,
@@ -266,11 +263,11 @@ def get_order_taxes(shopify_order, setting, items):
 		shopify_order.get("shipping_lines"),
 		setting,
 		items,
-		taxes_inclusive=shopify_order.get("taxes_included"),
+		taxes_inclusive=taxes_inclusive,
 	)
 
 	if cint(setting.consolidate_taxes):
-		taxes = consolidate_order_taxes(taxes)
+		taxes = consolidate_order_taxes(taxes, taxes_inclusive)
 
 	for row in taxes:
 		tax_detail = row.get("item_wise_tax_detail")
@@ -280,7 +277,7 @@ def get_order_taxes(shopify_order, setting, items):
 	return taxes
 
 
-def consolidate_order_taxes(taxes):
+def consolidate_order_taxes(taxes, taxes_inclusive=False):
 	tax_account_wise_data = {}
 	for tax in taxes:
 		account_head = tax["account_head"]
@@ -291,7 +288,7 @@ def consolidate_order_taxes(taxes):
 				"account_head": account_head,
 				"description": tax.get("description"),
 				"cost_center": tax.get("cost_center"),
-				"included_in_print_rate": 0,
+				"included_in_print_rate": 1 if taxes_inclusive else 0,
 				"dont_recompute_tax": 1,
 				"tax_amount": 0,
 				"item_wise_tax_detail": {},
@@ -485,50 +482,31 @@ def get_discount_info(shopify_order: dict) -> dict:
 	
 	Hybrid approach:
 	- If coupon code exists in ERPNext, use native coupon_code field
-	- Otherwise, fallback to additional_discount_percentage or discount_amount
+	- Otherwise, fallback to discount_amount (actual amount from Shopify)
 	
 	Returns:
 		dict: {
 			"codes": "CODE1, CODE2" (comma-separated string for custom field),
-			"percentage": 5.0 (float, for percentage discounts),
-			"amount": 10.0 (float, for fixed amount discounts),
+			"amount": 44.90 (float, actual discount amount from Shopify),
 			"coupon_code": "CODE1" or None (ERPNext native coupon if exists),
 			"use_native_coupon": True/False
 		}
 	"""
 	discount_codes = shopify_order.get("discount_codes") or []
-	discount_applications = shopify_order.get("discount_applications") or []
 	
 	# Extract all discount codes (comma-separated)
 	code_list = [dc.get("code", "") for dc in discount_codes if dc.get("code")]
 	codes = ", ".join(code_list)
 	
-	# Extract discount percentage and fixed amount from discount_applications
-	percentage = 0.0
-	fixed_amount = 0.0
+	# Get the actual discount amount from Shopify (this is the real amount applied)
+	# This comes from discount_codes[].amount which is the actual EUR/USD amount
+	total_discount_amount = 0.0
+	for dc in discount_codes:
+		total_discount_amount += flt(dc.get("amount", 0))
 	
-	for app in discount_applications:
-		value_type = app.get("value_type")
-		value = flt(app.get("value", 0))
-		
-		if value_type == "percentage":
-			percentage += value
-		elif value_type == "fixed_amount":
-			fixed_amount += value
-	
-	# If no percentage from applications, calculate from discount_codes (fallback)
-	if not percentage and not fixed_amount and discount_codes:
-		# discount_codes has the actual amount applied
-		for dc in discount_codes:
-			dc_type = dc.get("type")
-			dc_amount = flt(dc.get("amount", 0))
-			
-			if dc_type == "percentage":
-				# We need to calculate percentage from amount
-				# This is a fallback, discount_applications is more reliable
-				pass
-			elif dc_type == "fixed_amount" or dc_amount > 0:
-				fixed_amount += dc_amount
+	# Fallback: Use total_discounts from order level
+	if not total_discount_amount:
+		total_discount_amount = flt(shopify_order.get("total_discounts", 0))
 	
 	# Check if any coupon code exists in ERPNext
 	erpnext_coupon = None
@@ -539,8 +517,7 @@ def get_discount_info(shopify_order: dict) -> dict:
 	
 	return {
 		"codes": codes,
-		"percentage": percentage,
-		"amount": fixed_amount,
+		"amount": total_discount_amount,
 		"coupon_code": erpnext_coupon,
 		"use_native_coupon": bool(erpnext_coupon),
 	}
