@@ -151,7 +151,13 @@ def create_sales_order(shopify_order, setting, company=None):
 		if sales_partner_info:
 			so.sales_partner = sales_partner_info.get("sales_partner")
 			if sales_partner_info.get("commission_rate"):
-				so.commission_rate = sales_partner_info.get("commission_rate")
+				# Adjust commission rate to calculate on Grand Total (tax-inclusive)
+				# ERPNext calculates commission on Net Total, so we need to multiply by (1 + tax_rate)
+				# Example: 10% on Grand Total = 10% × 1.19 = 11.9% on Net Total
+				commission_rate = flt(sales_partner_info.get("commission_rate"))
+				tax_rate = _get_order_tax_rate(shopify_order)
+				adjusted_commission_rate = commission_rate * (1 + tax_rate)
+				so.commission_rate = adjusted_commission_rate
 
 		if company:
 			so.update({"company": company, "status": "Draft"})
@@ -232,6 +238,21 @@ def _get_item_price(line_item, taxes_inclusive: bool) -> float:
 def _get_total_discount(line_item) -> float:
 	discount_allocations = line_item.get("discount_allocations") or []
 	return sum(flt(discount.get("amount")) for discount in discount_allocations)
+
+
+def _get_order_tax_rate(shopify_order: dict) -> float:
+	"""Get the primary tax rate from the order.
+	
+	Returns the tax rate as decimal (e.g., 0.19 for 19%).
+	"""
+	line_items = shopify_order.get("line_items") or []
+	
+	for item in line_items:
+		tax_lines = item.get("tax_lines") or []
+		if tax_lines:
+			return flt(tax_lines[0].get("rate", 0))
+	
+	return 0.0
 
 
 def get_order_taxes(shopify_order, setting, items):

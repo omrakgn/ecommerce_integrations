@@ -11,7 +11,7 @@ from ecommerce_integrations.shopify.utils import create_shopify_log
 
 
 def prepare_sales_invoice(payload, request_id=None):
-	from ecommerce_integrations.shopify.order import get_sales_order
+	from ecommerce_integrations.shopify.order import get_sales_order, create_order
 
 	order = payload
 
@@ -21,11 +21,17 @@ def prepare_sales_invoice(payload, request_id=None):
 
 	try:
 		sales_order = get_sales_order(cstr(order["id"]))
+		
+		# If Sales Order doesn't exist, create it first
+		# This handles cases where orders/paid webhook arrives before orders/create
+		if not sales_order:
+			sales_order = create_order(order, setting)
+		
 		if sales_order:
 			create_sales_invoice(order, setting, sales_order)
 			create_shopify_log(status="Success")
 		else:
-			create_shopify_log(status="Invalid", message="Sales Order not found for syncing sales invoice.")
+			create_shopify_log(status="Invalid", message="Sales Order could not be created or found.")
 	except Exception as e:
 		create_shopify_log(status="Error", exception=e, rollback=True)
 
