@@ -263,21 +263,41 @@ def get_order_taxes(shopify_order, setting, items):
 	for line_item in line_items:
 		item_code = get_item_code(line_item)
 		for tax in line_item.get("tax_lines"):
-			taxes.append(
-				{
-					"charge_type": "Actual",
-					"account_head": get_tax_account_head(tax, charge_type="sales_tax"),
-					"description": (
-						get_tax_account_description(tax)
-						or f"{tax.get('title')} - {tax.get('rate') * 100.0:.2f}%"
-					),
-					"tax_amount": tax.get("price"),
-					"included_in_print_rate": 1 if taxes_inclusive else 0,  # Mark as inclusive if prices include tax
-					"cost_center": setting.cost_center,
-					"item_wise_tax_detail": {item_code: [flt(tax.get("rate")) * 100, flt(tax.get("price"))]},
-					"dont_recompute_tax": 1,
-				}
-			)
+			tax_rate = flt(tax.get("rate")) * 100  # Convert to percentage (0.19 -> 19)
+			
+			if taxes_inclusive:
+				# Use percentage-based tax for inclusive pricing
+				taxes.append(
+					{
+						"charge_type": "On Net Total",
+						"account_head": get_tax_account_head(tax, charge_type="sales_tax"),
+						"description": (
+							get_tax_account_description(tax)
+							or f"{tax.get('title')} - {tax_rate:.2f}%"
+						),
+						"rate": tax_rate,
+						"included_in_print_rate": 1,
+						"cost_center": setting.cost_center,
+						"dont_recompute_tax": 0,
+					}
+				)
+			else:
+				# Use actual amount for non-inclusive pricing
+				taxes.append(
+					{
+						"charge_type": "Actual",
+						"account_head": get_tax_account_head(tax, charge_type="sales_tax"),
+						"description": (
+							get_tax_account_description(tax)
+							or f"{tax.get('title')} - {tax_rate:.2f}%"
+						),
+						"tax_amount": tax.get("price"),
+						"included_in_print_rate": 0,
+						"cost_center": setting.cost_center,
+						"item_wise_tax_detail": {item_code: [tax_rate, flt(tax.get("price"))]},
+						"dont_recompute_tax": 1,
+					}
+				)
 
 	update_taxes_with_shipping_lines(
 		taxes,
@@ -300,24 +320,39 @@ def get_order_taxes(shopify_order, setting, items):
 
 def consolidate_order_taxes(taxes, taxes_inclusive=False):
 	tax_account_wise_data = {}
+	
 	for tax in taxes:
 		account_head = tax["account_head"]
-		tax_account_wise_data.setdefault(
-			account_head,
-			{
-				"charge_type": "Actual",
-				"account_head": account_head,
-				"description": tax.get("description"),
-				"cost_center": tax.get("cost_center"),
-				"included_in_print_rate": 1 if taxes_inclusive else 0,
-				"dont_recompute_tax": 1,
-				"tax_amount": 0,
-				"item_wise_tax_detail": {},
-			},
-		)
-		tax_account_wise_data[account_head]["tax_amount"] += flt(tax.get("tax_amount"))
-		if tax.get("item_wise_tax_detail"):
-			tax_account_wise_data[account_head]["item_wise_tax_detail"].update(tax["item_wise_tax_detail"])
+		
+		if account_head not in tax_account_wise_data:
+			if taxes_inclusive:
+				# Use percentage-based for inclusive
+				tax_account_wise_data[account_head] = {
+					"charge_type": "On Net Total",
+					"account_head": account_head,
+					"description": tax.get("description"),
+					"cost_center": tax.get("cost_center"),
+					"included_in_print_rate": 1,
+					"dont_recompute_tax": 0,
+					"rate": tax.get("rate", 0),
+				}
+			else:
+				# Use actual amount for non-inclusive
+				tax_account_wise_data[account_head] = {
+					"charge_type": "Actual",
+					"account_head": account_head,
+					"description": tax.get("description"),
+					"cost_center": tax.get("cost_center"),
+					"included_in_print_rate": 0,
+					"dont_recompute_tax": 1,
+					"tax_amount": 0,
+					"item_wise_tax_detail": {},
+				}
+		
+		if not taxes_inclusive:
+			tax_account_wise_data[account_head]["tax_amount"] += flt(tax.get("tax_amount"))
+			if tax.get("item_wise_tax_detail"):
+				tax_account_wise_data[account_head]["item_wise_tax_detail"].update(tax["item_wise_tax_detail"])
 
 	return tax_account_wise_data.values()
 
