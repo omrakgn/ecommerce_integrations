@@ -68,11 +68,16 @@ def create_order(order, setting, company=None):
 
 	so = create_sales_order(order, setting, company)
 	if so:
+		# Commit the Sales Order first to prevent race conditions
+		frappe.db.commit()
+		
 		if order.get("financial_status") == "paid":
 			create_sales_invoice(order, setting, so)
 
 		if order.get("fulfillments"):
 			create_delivery_note(order, setting, so)
+	
+	return so
 
 
 def create_sales_order(shopify_order, setting, company=None):

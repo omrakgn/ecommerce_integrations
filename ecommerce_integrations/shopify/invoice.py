@@ -12,6 +12,7 @@ from ecommerce_integrations.shopify.utils import create_shopify_log
 
 def prepare_sales_invoice(payload, request_id=None):
 	from ecommerce_integrations.shopify.order import get_sales_order, create_order
+	import time
 
 	order = payload
 
@@ -22,16 +23,25 @@ def prepare_sales_invoice(payload, request_id=None):
 	try:
 		sales_order = get_sales_order(cstr(order["id"]))
 		
-		# If Sales Order doesn't exist, create it first
-		# This handles cases where orders/paid webhook arrives before orders/create
+		# If Sales Order doesn't exist, wait briefly and retry
+		# This handles race conditions where orders/paid arrives before orders/create completes
 		if not sales_order:
-			sales_order = create_order(order, setting)
+			frappe.db.commit()  # Commit any pending transactions
+			time.sleep(2)  # Wait for orders/create to complete
+			sales_order = get_sales_order(cstr(order["id"]))
+		
+		# Still no Sales Order? Don't create a new one - let orders/create handle it
+		# Just log and exit gracefully
+		if not sales_order:
+			create_shopify_log(
+				status="Queued", 
+				message="Sales Order not found yet. Waiting for orders/create webhook."
+			)
+			return
 		
 		if sales_order:
 			create_sales_invoice(order, setting, sales_order)
 			create_shopify_log(status="Success")
-		else:
-			create_shopify_log(status="Invalid", message="Sales Order could not be created or found.")
 	except Exception as e:
 		create_shopify_log(status="Error", exception=e, rollback=True)
 
