@@ -54,8 +54,17 @@ def create_sales_invoice(shopify_order, setting, so):
 		sales_invoice.naming_series = setting.sales_invoice_series or "SI-Shopify-"
 		
 		# Ensure customer is set (required for tax withholding)
-		if not sales_invoice.customer:
+		if not sales_invoice.customer and so.customer:
 			sales_invoice.customer = so.customer
+		elif not sales_invoice.customer:
+			# Fallback to default customer from settings
+			sales_invoice.customer = setting.default_customer
+		
+		# Ensure debit_to is set
+		if not sales_invoice.debit_to:
+			sales_invoice.debit_to = frappe.db.get_value(
+				"Company", sales_invoice.company, "default_receivable_account"
+			)
 		
 		sales_invoice.flags.ignore_mandatory = True
 		set_cost_center(sales_invoice.items, setting.cost_center)
