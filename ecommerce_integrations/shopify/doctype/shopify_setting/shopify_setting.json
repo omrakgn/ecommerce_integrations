@@ -50,6 +50,7 @@
   "upload_variants_as_items",
   "inventory_sync_section",
   "warehouse",
+  "price_list",
   "update_erpnext_stock_levels_to_shopify",
   "inventory_sync_frequency",
   "fetch_shopify_locations",
@@ -138,6 +139,13 @@
    "label": "Default warehouse",
    "mandatory_depends_on": "eval:doc.enable_shopify",
    "options": "Warehouse"
+  },
+  {
+   "description": "Price List used for Shopify orders. Leave empty to use default selling price list.",
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "options": "Price List"
   },
   {
    "description": "If Shopify does not have a customer in the order, then while syncing the orders, the system will consider the default customer for the order",
