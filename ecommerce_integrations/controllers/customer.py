@@ -52,6 +52,7 @@ class EcommerceCustomer:
 		"""Create address from dictionary containing fields used in Address doctype of ERPNext."""
 
 		customer_doc = self.get_customer_doc()
+		customer_doc.reload()  # Reload to get latest values
 
 		new_address = frappe.get_doc(
 			{
@@ -71,6 +72,7 @@ class EcommerceCustomer:
 		"""Create contact from dictionary containing fields used in Address doctype of ERPNext."""
 
 		customer_doc = self.get_customer_doc()
+		customer_doc.reload()  # Reload to get latest values (in case address was just set)
 
 		new_contact = frappe.get_doc(
 			{
@@ -84,3 +86,23 @@ class EcommerceCustomer:
 		# Set as Primary Contact on Customer if no primary exists
 		if not customer_doc.customer_primary_contact:
 			frappe.db.set_value("Customer", customer_doc.name, "customer_primary_contact", new_contact.name)
+		
+		# Set mobile_no and email_id on Customer for template compatibility
+		update_fields = {}
+		
+		# Get email from contact
+		if contact.get("email_ids"):
+			for email in contact.get("email_ids"):
+				if email.get("is_primary"):
+					update_fields["email_id"] = email.get("email_id")
+					break
+		
+		# Get phone from contact
+		if contact.get("phone_nos"):
+			for phone in contact.get("phone_nos"):
+				if phone.get("is_primary_phone") or phone.get("is_primary_mobile_no"):
+					update_fields["mobile_no"] = phone.get("phone")
+					break
+		
+		if update_fields:
+			frappe.db.set_value("Customer", customer_doc.name, update_fields)
