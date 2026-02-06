@@ -70,6 +70,18 @@ def create_sales_invoice(shopify_order, setting, so):
 			# Fallback to default customer from settings
 			sales_invoice.customer = setting.default_customer
 		
+		# Set Customer Primary Address and Contact from Customer master
+		if sales_invoice.customer:
+			customer_doc = frappe.get_doc("Customer", sales_invoice.customer)
+			
+			# Set Billing Address (Primary Address)
+			if customer_doc.customer_primary_address:
+				sales_invoice.customer_address = customer_doc.customer_primary_address
+			
+			# Set Contact Person (Primary Contact)
+			if customer_doc.customer_primary_contact:
+				sales_invoice.contact_person = customer_doc.customer_primary_contact
+		
 		# Ensure debit_to is set
 		if not sales_invoice.debit_to:
 			sales_invoice.debit_to = frappe.db.get_value(
