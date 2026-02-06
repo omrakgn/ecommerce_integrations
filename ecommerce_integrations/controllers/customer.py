@@ -53,23 +53,34 @@ class EcommerceCustomer:
 
 		customer_doc = self.get_customer_doc()
 
-		frappe.get_doc(
+		new_address = frappe.get_doc(
 			{
 				"doctype": "Address",
 				**address,
 				"links": [{"link_doctype": "Customer", "link_name": customer_doc.name}],
 			}
-		).insert(ignore_mandatory=True)
+		)
+		new_address.insert(ignore_mandatory=True)
+		
+		# Set as Primary Address on Customer if it's Billing type and no primary exists
+		address_type = address.get("address_type", "Billing")
+		if address_type == "Billing" and not customer_doc.customer_primary_address:
+			frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", new_address.name)
 
 	def create_customer_contact(self, contact: dict[str, str]) -> None:
 		"""Create contact from dictionary containing fields used in Address doctype of ERPNext."""
 
 		customer_doc = self.get_customer_doc()
 
-		frappe.get_doc(
+		new_contact = frappe.get_doc(
 			{
 				"doctype": "Contact",
 				**contact,
 				"links": [{"link_doctype": "Customer", "link_name": customer_doc.name}],
 			}
-		).insert(ignore_mandatory=True)
+		)
+		new_contact.insert(ignore_mandatory=True)
+		
+		# Set as Primary Contact on Customer if no primary exists
+		if not customer_doc.customer_primary_contact:
+			frappe.db.set_value("Customer", customer_doc.name, "customer_primary_contact", new_contact.name)
