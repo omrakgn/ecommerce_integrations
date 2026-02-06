@@ -77,10 +77,17 @@ def create_sales_invoice(shopify_order, setting, so):
 			# Set Billing Address (Primary Address)
 			if customer_doc.customer_primary_address:
 				sales_invoice.customer_address = customer_doc.customer_primary_address
+				# Trigger address display update
+				sales_invoice.run_method("set_customer_address")
 			
 			# Set Contact Person (Primary Contact)
 			if customer_doc.customer_primary_contact:
 				sales_invoice.contact_person = customer_doc.customer_primary_contact
+				# Get contact details
+				contact = frappe.get_doc("Contact", customer_doc.customer_primary_contact)
+				sales_invoice.contact_display = " ".join(filter(None, [contact.first_name, contact.last_name]))
+				sales_invoice.contact_email = contact.email_id
+				sales_invoice.contact_mobile = contact.mobile_no or contact.phone
 		
 		# Ensure debit_to is set
 		if not sales_invoice.debit_to:
