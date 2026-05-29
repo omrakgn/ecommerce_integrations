@@ -9,10 +9,14 @@ from ecommerce_integrations.shopify.constants import (
 )
 from ecommerce_integrations.shopify.utils import create_shopify_log
 
+# orders/paid can be processed before orders/create has committed the Sales
+# Order. Instead of blocking the worker with sleep(), the handler re-enqueues
+# itself a bounded number of times so the Sales Order has time to appear.
+MAX_INVOICE_RETRIES = 5
 
-def prepare_sales_invoice(payload, request_id=None):
-	from ecommerce_integrations.shopify.order import get_sales_order, create_order
-	import time
+
+def prepare_sales_invoice(payload, request_id=None, retry_count=0):
+	from ecommerce_integrations.shopify.order import get_sales_order
 
 	order = payload
 
@@ -22,26 +26,38 @@ def prepare_sales_invoice(payload, request_id=None):
 
 	try:
 		sales_order = get_sales_order(cstr(order["id"]))
-		
-		# If Sales Order doesn't exist, wait briefly and retry
-		# This handles race conditions where orders/paid arrives before orders/create completes
+
+		# Race condition: orders/paid processed before orders/create finished.
+		# Re-enqueue this job (bounded) instead of blocking the worker, letting
+		# orders/create commit the Sales Order in the meantime. The retry is sent
+		# only via the public frappe.enqueue API (no RQ internals) so it stays
+		# correct on every Frappe version.
 		if not sales_order:
-			frappe.db.commit()  # Commit any pending transactions
-			time.sleep(2)  # Wait for orders/create to complete
-			sales_order = get_sales_order(cstr(order["id"]))
-		
-		# Still no Sales Order? Don't create a new one - let orders/create handle it
-		# Just log and exit gracefully
-		if not sales_order:
-			create_shopify_log(
-				status="Queued", 
-				message="Sales Order not found yet. Waiting for orders/create webhook."
-			)
+			if retry_count < MAX_INVOICE_RETRIES:
+				frappe.enqueue(
+					"ecommerce_integrations.shopify.invoice.prepare_sales_invoice",
+					queue="short",
+					enqueue_after_commit=True,
+					payload=payload,
+					request_id=request_id,
+					retry_count=retry_count + 1,
+				)
+				create_shopify_log(
+					status="Queued",
+					message=f"Sales Order not found yet; retry {retry_count + 1}/{MAX_INVOICE_RETRIES} scheduled.",
+				)
+			else:
+				create_shopify_log(
+					status="Queued",
+					message=(
+						"Sales Order not found after retries. If the order is paid, "
+						"orders/create will create the invoice."
+					),
+				)
 			return
-		
-		if sales_order:
-			create_sales_invoice(order, setting, sales_order)
-			create_shopify_log(status="Success")
+
+		create_sales_invoice(order, setting, sales_order)
+		create_shopify_log(status="Success")
 	except Exception as e:
 		create_shopify_log(status="Error", exception=e, rollback=True)
 

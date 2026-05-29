@@ -142,13 +142,17 @@ def create_sales_order(shopify_order, setting, company=None):
 			PAYMENT_METHOD_FIELD: payment_method,
 		}
 		
-		# Discount is applied at item level (discount_percentage in each item)
-		# Just track coupon code if exists in ERPNext
-		if discount_info.get("use_native_coupon"):
-			so_data["coupon_code"] = discount_info.get("coupon_code")
-			so_data["ignore_pricing_rule"] = 0
-		else:
-			so_data["ignore_pricing_rule"] = 1
+		# Discount is always taken from Shopify's per-item calculation
+		# (discount_percentage/rate set in get_order_items), so the Grand Total
+		# always matches Shopify. ERPNext Pricing Rules are disabled to avoid
+		# double-applying the discount.
+		#
+		# The discount code itself is kept for reference in DISCOUNT_CODES_FIELD
+		# above; the native `coupon_code` field is intentionally NOT set because
+		# setting it can trigger coupon validation / Pricing Rule application
+		# (even with ignore_pricing_rule), which would either error out or
+		# double-discount the order.
+		so_data["ignore_pricing_rule"] = 1
 		
 		so = frappe.get_doc(so_data)
 		
@@ -223,6 +227,14 @@ def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
 			)
 		else:
 			items = []
+
+	# If any line item's product is missing, do not create a partial order.
+	# (The in-loop `else` above only clears items when a *later* existing item
+	# follows the missing one, so a missing *last* item would otherwise slip
+	# through as a partial order.) create_sales_order handles the empty list by
+	# logging an error and rolling back.
+	if not all_product_exists:
+		return []
 
 	return items
 
