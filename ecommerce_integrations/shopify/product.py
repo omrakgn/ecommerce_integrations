@@ -121,17 +121,22 @@ class ShopifyProduct:
 				item_attr.append("item_attribute_values", {"attribute_value": attr_value, "abbr": attr_value})
 
 	def _create_item(self, product_dict, warehouse, has_variant=0, attributes=None, variant_of=None):
+		sku = product_dict.get("sku") or _get_sku(product_dict)
+
 		item_dict = {
 			"variant_of": variant_of,
 			"is_stock_item": 1,
-			"item_code": cstr(product_dict.get("item_code")) or cstr(product_dict.get("id")),
+			# Use the Shopify SKU as the ERPNext Item Code (see _get_item_code).
+			# Matching/linkage stays keyed on the Shopify product_id/variant_id via
+			# the Ecommerce Item doctype, so the item_code is free to be the SKU.
+			"item_code": _get_item_code(sku, product_dict, has_variant),
 			"item_name": product_dict.get("title", "").strip(),
 			"description": product_dict.get("body_html") or product_dict.get("title"),
 			"item_group": self._get_item_group(product_dict.get("product_type")),
 			"has_variants": has_variant,
 			"attributes": attributes or [],
 			"stock_uom": product_dict.get("uom") or _("Nos"),
-			"sku": product_dict.get("sku") or _get_sku(product_dict),
+			"sku": sku,
 			"default_warehouse": warehouse,
 			"image": _get_item_image(product_dict),
 			"weight_uom": WEIGHT_TO_ERPNEXT_UOM_MAP[product_dict.get("weight_unit")],
@@ -263,6 +268,34 @@ def _get_sku(product_dict):
 	if product_dict.get("variants"):
 		return product_dict.get("variants")[0].get("sku")
 	return ""
+
+
+def _get_item_code(sku, product_dict, has_variant=0) -> str:
+	"""Resolve the ERPNext Item Code for a Shopify product/variant.
+
+	Preference order: Shopify SKU -> id provided in the dict -> Shopify id.
+
+	- Template items (`has_variant`) never use a SKU; the SKU belongs to the
+	  individual variants, so templates keep their Shopify id as item_code.
+	- If the SKU is empty, fall back to the Shopify id.
+	- If the SKU is already used by another ERPNext Item, fall back to the
+	  Shopify id so the sync never fails on a duplicate item_code. (Single
+	  products that match an existing Item are linked by _match_sku_and_link_item
+	  before reaching item creation.)
+
+	The Shopify product_id/variant_id remain the matching key (stored on the
+	Ecommerce Item), so the item_code is purely a human-friendly identifier.
+	"""
+	fallback_code = cstr(product_dict.get("item_code")) or cstr(product_dict.get("id"))
+
+	sku = cstr(sku).strip()
+	if not sku or has_variant:
+		return fallback_code
+
+	if frappe.db.exists("Item", {"item_code": sku}):
+		return fallback_code
+
+	return sku
 
 
 def _get_item_image(product_dict):
