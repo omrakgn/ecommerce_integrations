@@ -86,70 +86,63 @@ def get_product_bundle_inventory_levels(warehouses: tuple, integration: str) -> 
 			filters={"parent": bundle.bundle_name, "parenttype": "Product Bundle"},
 			fields=["item_code", "qty"]
 		)
-		
-		if not components:
+
+		# Bundle quantity per component; skip components with non-positive qty.
+		comp_qty = {c.item_code: flt(c.qty) for c in components if flt(c.qty) > 0}
+		if not comp_qty:
 			continue
-		
-		# Calculate minimum available quantity across all warehouses
-		min_bundle_qty = float('inf')
-		bundle_modified = None
-		primary_warehouse = None
-		
+
+		# Batch-fetch every component Bin across the requested warehouses in ONE
+		# query (avoids the previous per-component-per-warehouse N+1), then index
+		# it as bin_map[warehouse][item_code].
+		bins = frappe.db.get_all(
+			"Bin",
+			filters={"item_code": ["in", list(comp_qty)], "warehouse": ["in", list(warehouses)]},
+			fields=["item_code", "warehouse", "actual_qty", "reserved_qty", "modified"],
+		)
+		bin_map = {}
+		for b in bins:
+			bin_map.setdefault(b.warehouse, {})[b.item_code] = b
+
+		# Emit one row PER warehouse (like non-bundle items do), so multi-location
+		# setups map correctly. Bundle buildable qty in a warehouse is the minimum,
+		# across components, of floor(available / bundle_qty).
 		for warehouse in warehouses:
-			warehouse_bundle_qty = float('inf')
-			warehouse_modified = None
-			
-			for comp in components:
-				# Get component stock in this warehouse
-				bin_data = frappe.db.get_value(
-					"Bin",
-					{"item_code": comp.item_code, "warehouse": warehouse},
-					["actual_qty", "reserved_qty", "modified"],
-					as_dict=True
-				)
-				
-				if bin_data:
-					available_qty = flt(bin_data.actual_qty) - flt(bin_data.reserved_qty)
-					# How many bundles can we make with this component?
-					component_bundle_qty = available_qty / flt(comp.qty) if comp.qty else 0
-					warehouse_bundle_qty = min(warehouse_bundle_qty, component_bundle_qty)
-					
-					# Track the latest modification
-					if bin_data.modified:
-						if not warehouse_modified or bin_data.modified > warehouse_modified:
-							warehouse_modified = bin_data.modified
+			wh_bins = bin_map.get(warehouse)
+			if not wh_bins:
+				# No component stock information in this warehouse — nothing to sync.
+				continue
+
+			buildable = None
+			latest_modified = None
+			for item_code, qty in comp_qty.items():
+				b = wh_bins.get(item_code)
+				if b:
+					available = flt(b.actual_qty) - flt(b.reserved_qty)
+					comp_buildable = available / qty
+					if b.modified and (latest_modified is None or b.modified > latest_modified):
+						latest_modified = b.modified
 				else:
-					# Component not in this warehouse
-					warehouse_bundle_qty = 0
-					break
-			
-			if warehouse_bundle_qty != float('inf') and warehouse_bundle_qty >= 0:
-				if warehouse_bundle_qty < min_bundle_qty or (warehouse_bundle_qty > 0 and min_bundle_qty == float('inf')):
-					min_bundle_qty = warehouse_bundle_qty
-					bundle_modified = warehouse_modified
-					primary_warehouse = warehouse
-		
-		# Skip if no valid quantity calculated
-		if min_bundle_qty == float('inf'):
-			min_bundle_qty = 0
-		
-		# Check if inventory was modified since last sync
-		if bundle_modified and bundle.inventory_synced_on:
-			if bundle_modified <= bundle.inventory_synced_on:
-				continue  # No changes since last sync
-		
-		if primary_warehouse:
+					# Component not stocked here → cannot build any bundle here.
+					comp_buildable = 0
+				buildable = comp_buildable if buildable is None else min(buildable, comp_buildable)
+
+			# Skip if no component Bin in this warehouse changed since the last sync.
+			if latest_modified and bundle.inventory_synced_on and latest_modified <= bundle.inventory_synced_on:
+				continue
+
 			result.append(frappe._dict({
 				"ecom_item": bundle.ecom_item,
 				"item_code": bundle.item_code,
 				"integration_item_code": bundle.integration_item_code,
 				"variant_id": bundle.variant_id,
-				"actual_qty": int(min_bundle_qty),
+				# Shopify has no fractional stock; floor to a safe whole number.
+				"actual_qty": int(max(buildable, 0)),
 				"reserved_qty": 0,
-				"warehouse": primary_warehouse,
+				"warehouse": warehouse,
 				"is_bundle": True
 			}))
-	
+
 	return result
 
 

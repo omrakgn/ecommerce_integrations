@@ -86,24 +86,35 @@ def create_sales_invoice(shopify_order, setting, so):
 			# Fallback to default customer from settings
 			sales_invoice.customer = setting.default_customer
 		
-		# Set Customer Primary Address and Contact from Customer master
+		# Set Customer Primary Address and Contact from Customer master.
+		# Wrapped defensively: a missing/broken Contact or Address must never block
+		# invoice creation for a paid order — worst case the invoice is created
+		# without a pre-filled contact and can be corrected manually.
 		if sales_invoice.customer:
-			customer_doc = frappe.get_doc("Customer", sales_invoice.customer)
-			
-			# Set Billing Address (Primary Address)
-			if customer_doc.customer_primary_address:
-				sales_invoice.customer_address = customer_doc.customer_primary_address
-				# Trigger address display update
-				sales_invoice.run_method("set_customer_address")
-			
-			# Set Contact Person (Primary Contact)
-			if customer_doc.customer_primary_contact:
-				sales_invoice.contact_person = customer_doc.customer_primary_contact
-				# Get contact details
-				contact = frappe.get_doc("Contact", customer_doc.customer_primary_contact)
-				sales_invoice.contact_display = " ".join(filter(None, [contact.first_name, contact.last_name]))
-				sales_invoice.contact_email = contact.email_id
-				sales_invoice.contact_mobile = contact.mobile_no or contact.phone
+			try:
+				customer_doc = frappe.get_doc("Customer", sales_invoice.customer)
+
+				# Billing Address (Primary Address)
+				if customer_doc.customer_primary_address:
+					sales_invoice.customer_address = customer_doc.customer_primary_address
+					sales_invoice.run_method("set_customer_address")
+
+				# Contact Person (Primary Contact)
+				if customer_doc.customer_primary_contact and frappe.db.exists(
+					"Contact", customer_doc.customer_primary_contact
+				):
+					sales_invoice.contact_person = customer_doc.customer_primary_contact
+					contact = frappe.get_doc("Contact", customer_doc.customer_primary_contact)
+					sales_invoice.contact_display = " ".join(
+						filter(None, [contact.first_name, contact.last_name])
+					)
+					sales_invoice.contact_email = contact.email_id
+					sales_invoice.contact_mobile = contact.mobile_no or contact.phone
+			except Exception:
+				frappe.log_error(
+					title="Shopify: could not set customer address/contact on invoice",
+					message=frappe.get_traceback(),
+				)
 		
 		# Ensure debit_to is set
 		if not sales_invoice.debit_to:
@@ -130,36 +141,56 @@ def set_cost_center(items, cost_center):
 
 
 def get_payment_gateway(shopify_order) -> str:
-	"""Extract payment gateway name from Shopify order."""
+	"""Extract payment gateway name from Shopify order.
+
+	Shopify can report multiple gateways for a single order (e.g. split payment:
+	gift card + card). We use the first one for the Mode of Payment but log the
+	rest so a split payment doesn't silently lose information.
+	"""
 	payment_gateway_names = shopify_order.get("payment_gateway_names") or []
-	if payment_gateway_names:
-		return payment_gateway_names[0]  # Primary payment method
-	return ""
+	if not payment_gateway_names:
+		return ""
+	if len(payment_gateway_names) > 1:
+		frappe.logger("shopify").info(
+			f"Order {shopify_order.get('name')} has multiple payment gateways "
+			f"{payment_gateway_names}; using '{payment_gateway_names[0]}' for Mode of Payment."
+		)
+	return payment_gateway_names[0]  # Primary payment method
 
 
 def get_mode_of_payment(payment_gateway: str, setting) -> str | None:
 	"""Get ERPNext Mode of Payment based on Shopify payment gateway.
-	
-	First checks Shopify Payment Gateway Mapping in settings.
-	Falls back to finding Mode of Payment with same name.
+
+	First checks Shopify Payment Gateway Mapping in settings, then falls back to
+	an *exact* Mode of Payment name match. A fuzzy `LIKE %gateway%` fallback was
+	removed on purpose: it could silently pick the wrong Mode of Payment (e.g.
+	gateway "Cash on Delivery" matching "Cash"), posting the Payment Entry to the
+	wrong account. When nothing matches we log and return None so the mismatch is
+	visible rather than hidden.
 	"""
 	if not payment_gateway:
 		return None
-	
-	# Check if there's a mapping in Shopify Settings
-	if hasattr(setting, 'payment_gateway_mapping') and setting.payment_gateway_mapping:
-		for mapping in setting.payment_gateway_mapping:
-			if mapping.shopify_payment_gateway.lower() == payment_gateway.lower():
-				return mapping.mode_of_payment
-	
-	# Fallback: Check if Mode of Payment exists with same/similar name
-	mode_of_payment = frappe.db.get_value(
-		"Mode of Payment",
-		{"name": ("like", f"%{payment_gateway}%")},
-		"name"
+
+	# 1. Explicit mapping in Shopify Setting (case-insensitive)
+	for mapping in setting.payment_gateway_mapping or []:
+		if (mapping.shopify_payment_gateway or "").lower() == payment_gateway.lower():
+			return mapping.mode_of_payment
+
+	# 2. Exact Mode of Payment name match
+	mode_of_payment = frappe.db.get_value("Mode of Payment", payment_gateway, "name")
+	if mode_of_payment:
+		return mode_of_payment
+
+	# 3. Nothing matched — surface it instead of guessing an account.
+	frappe.log_error(
+		title="Shopify: Mode of Payment not mapped",
+		message=(
+			f"No Payment Gateway Mapping and no exact Mode of Payment for Shopify "
+			f"gateway '{payment_gateway}'. Payment Entry will be created without a "
+			f"Mode of Payment. Add a mapping in Shopify Setting to fix this."
+		),
 	)
-	
-	return mode_of_payment
+	return None
 
 
 def make_payment_entry_against_sales_invoice(doc, setting, posting_date=None, payment_gateway=None):

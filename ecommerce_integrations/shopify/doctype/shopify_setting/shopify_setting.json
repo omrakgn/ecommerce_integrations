@@ -141,7 +141,7 @@
    "options": "Warehouse"
   },
   {
-   "description": "Price List used for Shopify orders. Leave empty to use default selling price list.",
+   "description": "Not currently used by the sync. Shopify orders keep their own line prices via an internal dummy price list, so this value is ignored. Kept for backward compatibility.",
    "fieldname": "price_list",
    "fieldtype": "Link",
    "label": "Price List",
