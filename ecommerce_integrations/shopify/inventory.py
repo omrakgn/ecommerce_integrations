@@ -57,20 +57,18 @@ def get_product_bundle_inventory_levels(warehouses: tuple, integration: str) -> 
 	"""
 	# Get all Ecommerce Items that are Product Bundles
 	bundle_items = frappe.db.sql("""
-		SELECT 
+		SELECT
 			ei.name as ecom_item,
 			ei.erpnext_item_code as item_code,
 			ei.integration_item_code,
 			ei.variant_id,
-			ei.inventory_synced_on
+			ei.inventory_synced_on,
+			pb.name as bundle_name
 		FROM `tabEcommerce Item` ei
 		INNER JOIN `tabItem` i ON ei.erpnext_item_code = i.name
+		INNER JOIN `tabProduct Bundle` pb ON pb.new_item_code = ei.erpnext_item_code
 		WHERE ei.integration = %s
 		AND i.is_stock_item = 0
-		AND EXISTS (
-			SELECT 1 FROM `tabProduct Bundle` pb 
-			WHERE pb.new_item_code = ei.erpnext_item_code
-		)
 	""", (integration,), as_dict=True)
 	
 	if not bundle_items:
@@ -79,10 +77,13 @@ def get_product_bundle_inventory_levels(warehouses: tuple, integration: str) -> 
 	result = []
 	
 	for bundle in bundle_items:
-		# Get Product Bundle components
+		# Get Product Bundle components.
+		# NOTE: Product Bundle Item.parent is the Product Bundle *name*, which is
+		# not necessarily equal to new_item_code (Shopify-created bundles are named
+		# by their numeric id). So we must look up by bundle.bundle_name, not item_code.
 		components = frappe.db.get_all(
 			"Product Bundle Item",
-			filters={"parent": bundle.item_code},
+			filters={"parent": bundle.bundle_name, "parenttype": "Product Bundle"},
 			fields=["item_code", "qty"]
 		)
 		
