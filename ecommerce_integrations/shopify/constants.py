@@ -40,6 +40,9 @@ ITEM_SELLING_RATE_FIELD = "shopify_selling_rate"
 DISCOUNT_CODES_FIELD = "shopify_discount_codes"
 PAYMENT_METHOD_FIELD = "shopify_payment_method"
 
+# Sales Order "Shopify" tab that groups all Shopify-related fields
+SHOPIFY_TAB_FIELD = "shopify_tab"
+
 # marketing attribution (parsed from the Shopify order's landing_site / referring_site)
 MARKETING_SECTION_FIELD = "shopify_marketing_section"
 MARKETING_CHANNEL_FIELD = "shopify_marketing_channel"
