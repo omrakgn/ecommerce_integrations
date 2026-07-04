@@ -13,16 +13,24 @@ frappe.ui.form.on("Shopify Sales Partner Rule", {
 });
 
 function load_match_value_options(frm) {
-	if (!frm.doc.mapping_type) {
-		frm.set_df_property("mapping_value", "options", "");
+	const field = frm.get_field("mapping_value");
+	if (!frm.doc.mapping_type || !field) {
 		return;
 	}
 	frappe.call({
 		method: "ecommerce_integrations.shopify.doctype.shopify_sales_partner_rule.shopify_sales_partner_rule.get_observed_values",
 		args: { match_on: frm.doc.mapping_type },
 		callback: (r) => {
-			frm.set_df_property("mapping_value", "options", (r.message || []).join("\n"));
-			frm.refresh_field("mapping_value");
+			const options = r.message || [];
+			// The Autocomplete control keeps its suggestion list internally;
+			// set_data() is what actually refreshes it. Fall back to df.options
+			// for any control that doesn't expose set_data.
+			if (typeof field.set_data === "function") {
+				field.set_data(options);
+			} else {
+				frm.set_df_property("mapping_value", "options", options.join("\n"));
+				frm.refresh_field("mapping_value");
+			}
 		},
 	});
 }
