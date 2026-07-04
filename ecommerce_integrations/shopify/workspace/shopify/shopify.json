@@ -1,0 +1,66 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"sh_hdr_main\",\"type\":\"header\",\"data\":{\"text\":\"Shopify\",\"level\":4,\"col\":12}},{\"id\":\"sh_sc_setting\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Shopify Setting\",\"col\":3}},{\"id\":\"sh_sc_item\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ecommerce Items\",\"col\":3}},{\"id\":\"sh_sc_log\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Logs\",\"col\":3}},{\"id\":\"sh_sc_rule\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Partner Rules\",\"col\":3}},{\"id\":\"sh_hdr_attr\",\"type\":\"header\",\"data\":{\"text\":\"Marketing Attribution\",\"level\":4,\"col\":12}},{\"id\":\"sh_sc_attrval\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Values\",\"col\":3}},{\"id\":\"sh_sc_attrrep\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Overview\",\"col\":3}}]",
+ "creation": "2026-07-05 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "shopping-cart",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Shopify",
+ "links": [],
+ "modified": "2026-07-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "shopify",
+ "name": "Shopify",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 20.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "label": "Shopify Setting",
+   "link_to": "Shopify Setting",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "label": "Ecommerce Items",
+   "link_to": "Ecommerce Item",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "label": "Integration Logs",
+   "link_to": "Ecommerce Integration Log",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "label": "Sales Partner Rules",
+   "link_to": "Shopify Sales Partner Rule",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "label": "Attribution Values",
+   "link_to": "Shopify Attribution Value",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "Report",
+   "label": "Attribution Overview",
+   "link_to": "Shopify Attribution Overview",
+   "type": "Report"
+  }
+ ],
+ "title": "Shopify"
+}
