@@ -118,15 +118,21 @@ class ShopifySetting(SettingController):
 		}
 
 
-def _last_standard_field(doctype: str) -> str:
-	"""Return the fieldname of the very last *standard* field of a DocType.
+def _marketplace_tab_anchor(doctype: str) -> str:
+	"""Fieldname to anchor the custom "Marketplace" Tab Break on.
 
-	Used to anchor our custom "Marketplace" Tab Break AFTER every standard field,
-	so the new tab is appended at the end and no native field is pulled into it —
-	which is what corrupted the layout when we anchored on `amended_from`.
+	We place it right BEFORE the native "Connections" tab (the dashboard tab that
+	must stay last), i.e. after the standard field that immediately precedes
+	`connections_tab`. That makes Marketplace a normal tab in the sequence,
+	bounded by connections_tab, so it renders reliably and pulls no native field
+	into it. Falls back to the last standard field if there is no connections_tab.
 	"""
-	rows = frappe.get_all("DocField", filters={"parent": doctype}, order_by="idx desc", pluck="fieldname", limit=1)
-	return rows[0] if rows else "amended_from"
+	fields = frappe.get_all("DocField", filters={"parent": doctype}, order_by="idx", pluck="fieldname")
+	if "connections_tab" in fields:
+		i = fields.index("connections_tab")
+		if i > 0:
+			return fields[i - 1]
+	return fields[-1] if fields else "amended_from"
 
 
 def setup_custom_fields():
@@ -184,7 +190,7 @@ def setup_custom_fields():
 				fieldname=MARKETPLACE_TAB_FIELD,
 				label="Marketplace",
 				fieldtype="Tab Break",
-				insert_after=_last_standard_field("Sales Order"),
+				insert_after=_marketplace_tab_anchor("Sales Order"),
 				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
