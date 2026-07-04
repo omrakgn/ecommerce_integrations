@@ -22,14 +22,12 @@ from ecommerce_integrations.shopify.constants import (
 	ITEM_SELLING_RATE_FIELD,
 	LANDING_SITE_FIELD,
 	MARKETING_CHANNEL_FIELD,
-	MARKETING_SECTION_FIELD,
 	ORDER_ID_FIELD,
 	ORDER_ITEM_DISCOUNT_FIELD,
 	ORDER_NUMBER_FIELD,
 	ORDER_STATUS_FIELD,
 	PAYMENT_METHOD_FIELD,
 	REFERRING_SITE_FIELD,
-	SHOPIFY_TAB_FIELD,
 	SUPPLIER_ID_FIELD,
 	UTM_CAMPAIGN_FIELD,
 	UTM_CONTENT_FIELD,
@@ -119,6 +117,10 @@ class ShopifySetting(SettingController):
 
 
 def setup_custom_fields():
+	# Show Shopify fields only on orders that actually came from Shopify. This is
+	# field-level visibility (safe), never a structural Section/Tab break.
+	_SHOPIFY_ONLY = "eval:doc.shopify_order_id"
+
 	custom_fields = {
 		"Item": [
 			dict(
@@ -159,23 +161,20 @@ def setup_custom_fields():
 			)
 		],
 		"Sales Order": [
-			# All Shopify-related fields live in a dedicated "Shopify" tab so they
-			# don't clutter the main Sales Order form. The tab (and everything in
-			# it) only shows for orders that actually came from Shopify.
-			dict(
-				fieldname=SHOPIFY_TAB_FIELD,
-				label="Shopify",
-				fieldtype="Tab Break",
-				insert_after="amended_from",
-				depends_on="eval:doc.shopify_order_id",
-			),
+			# IMPORTANT: do NOT add Section Break / Tab Break custom fields here.
+			# v15 Sales Order uses native tabs, and injecting structural breaks via
+			# custom fields corrupts that layout. Instead every Shopify field is a
+			# plain field gated with depends_on="eval:doc.shopify_order_id", so the
+			# whole group is hidden on non-Shopify orders and the form layout is
+			# never touched. (_SHOPIFY_ONLY is defined above this dict.)
 			dict(
 				fieldname=ORDER_ID_FIELD,
 				label="Shopify Order Id",
 				fieldtype="Small Text",
-				insert_after=SHOPIFY_TAB_FIELD,
+				insert_after="title",
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=ORDER_NUMBER_FIELD,
@@ -184,6 +183,7 @@ def setup_custom_fields():
 				insert_after=ORDER_ID_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=ORDER_STATUS_FIELD,
@@ -192,6 +192,7 @@ def setup_custom_fields():
 				insert_after=ORDER_NUMBER_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=DISCOUNT_CODES_FIELD,
@@ -200,6 +201,7 @@ def setup_custom_fields():
 				insert_after=ORDER_STATUS_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 				description="Comma-separated list of discount codes used in this order",
 			),
 			dict(
@@ -209,82 +211,84 @@ def setup_custom_fields():
 				insert_after=DISCOUNT_CODES_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 				description="Payment gateway used for this order (e.g., Klarna, PayPal, Stripe)",
 			),
 			dict(
-				fieldname=MARKETING_SECTION_FIELD,
-				label="Marketing Attribution",
-				fieldtype="Section Break",
-				insert_after=PAYMENT_METHOD_FIELD,
-				collapsible=1,
-			),
-			dict(
 				fieldname=MARKETING_CHANNEL_FIELD,
-				label="Marketing Channel",
+				label="Shopify Marketing Channel",
 				fieldtype="Data",
-				insert_after=MARKETING_SECTION_FIELD,
+				insert_after=PAYMENT_METHOD_FIELD,
 				read_only=1,
 				print_hide=1,
 				in_standard_filter=1,
+				depends_on=_SHOPIFY_ONLY,
 				description="Derived channel: Meta Ads / Google Ads / Google Organic / Organic Search / Referral / Direct",
 			),
 			dict(
 				fieldname=UTM_SOURCE_FIELD,
-				label="UTM Source",
+				label="Shopify UTM Source",
 				fieldtype="Data",
 				insert_after=MARKETING_CHANNEL_FIELD,
 				read_only=1,
 				print_hide=1,
 				in_standard_filter=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=UTM_MEDIUM_FIELD,
-				label="UTM Medium",
+				label="Shopify UTM Medium",
 				fieldtype="Data",
 				insert_after=UTM_SOURCE_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=UTM_CAMPAIGN_FIELD,
-				label="UTM Campaign",
+				label="Shopify UTM Campaign",
 				fieldtype="Data",
 				insert_after=UTM_MEDIUM_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=UTM_CONTENT_FIELD,
-				label="UTM Content",
+				label="Shopify UTM Content",
 				fieldtype="Data",
 				insert_after=UTM_CAMPAIGN_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=UTM_TERM_FIELD,
-				label="UTM Term",
+				label="Shopify UTM Term",
 				fieldtype="Data",
 				insert_after=UTM_CONTENT_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 			dict(
 				fieldname=LANDING_SITE_FIELD,
-				label="Landing Site",
+				label="Shopify Landing Site",
 				fieldtype="Small Text",
 				insert_after=UTM_TERM_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 				description="First-touch URL (path + query) recorded by Shopify",
 			),
 			dict(
 				fieldname=REFERRING_SITE_FIELD,
-				label="Referring Site",
+				label="Shopify Referring Site",
 				fieldtype="Small Text",
 				insert_after=LANDING_SITE_FIELD,
 				read_only=1,
 				print_hide=1,
+				depends_on=_SHOPIFY_ONLY,
 			),
 		],
 		"Sales Order Item": [
