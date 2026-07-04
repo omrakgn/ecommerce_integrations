@@ -42,7 +42,6 @@ After installation follow user documentation for each integration to set it up.
 - Enable developer mode.
 - If you want to use a tunnel for local development. Set `localtunnel_url` parameter in your site_config file with ngrok / localtunnel URL. This will be used in most places to register webhooks. Likewise, use this parameter wherever you're sending current site URL to integrations in development mode.
 
-
 #### License
 
 GNU GPL v3.0
