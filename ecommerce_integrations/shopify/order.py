@@ -607,81 +607,59 @@ def get_discount_info(shopify_order: dict) -> dict:
 
 
 def get_sales_partner_from_mapping(shopify_order: dict, setting) -> dict | None:
-	"""Find Sales Partner based on discount codes or referral/UTM parameters.
-	
-	Priority:
-		1. First check discount codes
-		2. Then check landing_site for referral/UTM parameters
-		3. Then check referring_site
-	
-	Returns:
-		dict: {"sales_partner": "Partner Name", "commission_rate": 5.0} or None
+	"""Find a Sales Partner for the order using the "Shopify Sales Partner Rule" list.
+
+	Rules are evaluated in ``priority`` order (lowest first); the first matching
+	rule wins. A rule matches on one attribution signal:
+
+	- Discount Code:     an order discount code equals the value (case-insensitive)
+	- UTM Source/Campaign/Medium: the parsed UTM value equals the value
+	- Marketing Channel: the derived channel equals the value (e.g. "Meta Ads")
+	- Referral URL:      the value appears anywhere in landing/referring URL
+
+	Returns: {"sales_partner": ..., "commission_rate": ...} or None.
 	"""
 	if not cint(setting.enable_sales_partner_mapping):
 		return None
-	
-	mappings = setting.sales_partner_mapping or []
-	if not mappings:
+
+	rules = frappe.get_all(
+		"Shopify Sales Partner Rule",
+		filters={"enabled": 1},
+		fields=["mapping_type", "mapping_value", "sales_partner", "commission_rate"],
+		order_by="priority asc, creation asc",
+	)
+	if not rules:
 		return None
-	
-	# Build lookup dictionaries for faster matching
-	discount_code_mappings = {}
-	referral_mappings = {}
-	
-	for m in mappings:
-		if m.mapping_type == "Discount Code":
-			# Store lowercase for case-insensitive matching
-			discount_code_mappings[m.mapping_value.lower()] = {
-				"sales_partner": m.sales_partner,
-				"commission_rate": m.commission_rate,
-			}
-		elif m.mapping_type == "Referral/UTM":
-			referral_mappings[m.mapping_value.lower()] = {
-				"sales_partner": m.sales_partner,
-				"commission_rate": m.commission_rate,
-			}
-	
-	# 1. Check discount codes first
-	discount_codes = shopify_order.get("discount_codes") or []
-	for dc in discount_codes:
-		code = (dc.get("code") or "").lower()
-		if code and code in discount_code_mappings:
-			return discount_code_mappings[code]
-	
-	# 2. Check landing_site for referral/UTM parameters
-	landing_site = shopify_order.get("landing_site") or ""
-	if landing_site:
-		partner = _match_referral_pattern(landing_site, referral_mappings)
-		if partner:
-			return partner
-	
-	# 3. Check referring_site
-	referring_site = shopify_order.get("referring_site") or ""
-	if referring_site:
-		partner = _match_referral_pattern(referring_site, referral_mappings)
-		if partner:
-			return partner
-	
-	return None
 
+	attribution = get_marketing_attribution(shopify_order)
+	discount_codes = {
+		(dc.get("code") or "").lower() for dc in (shopify_order.get("discount_codes") or [])
+	}
+	landing = (shopify_order.get("landing_site") or "").lower()
+	referring = (shopify_order.get("referring_site") or "").lower()
 
-def _match_referral_pattern(url: str, referral_mappings: dict) -> dict | None:
-	"""Match URL against referral/UTM patterns.
-	
-	Args:
-		url: The landing_site or referring_site URL
-		referral_mappings: Dict of pattern -> partner info
-	
-	Returns:
-		Partner info dict or None
-	"""
-	url_lower = url.lower()
-	
-	for pattern, partner_info in referral_mappings.items():
-		# Check if pattern exists anywhere in the URL
-		# This handles both query params (ref=PARTNER) and path-based refs
-		if pattern in url_lower:
-			return partner_info
+	# Attribution values are keyed by the Shopify custom fieldnames.
+	utm_source = (attribution.get(UTM_SOURCE_FIELD) or "").lower()
+	utm_campaign = (attribution.get(UTM_CAMPAIGN_FIELD) or "").lower()
+	utm_medium = (attribution.get(UTM_MEDIUM_FIELD) or "").lower()
+	channel = (attribution.get(MARKETING_CHANNEL_FIELD) or "").lower()
+
+	for rule in rules:
+		value = (rule.mapping_value or "").strip().lower()
+		if not value:
+			continue
+
+		mtype = rule.mapping_type
+		matched = (
+			(mtype == "Discount Code" and value in discount_codes)
+			or (mtype == "UTM Source" and value == utm_source)
+			or (mtype == "UTM Campaign" and value == utm_campaign)
+			or (mtype == "UTM Medium" and value == utm_medium)
+			or (mtype == "Marketing Channel" and value == channel)
+			or (mtype == "Referral URL" and (value in landing or value in referring))
+		)
+		if matched:
+			return {"sales_partner": rule.sales_partner, "commission_rate": rule.commission_rate}
 
 	return None
 

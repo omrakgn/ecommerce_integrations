@@ -1,0 +1,127 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:rule_name",
+ "creation": "2026-07-04 23:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "rule_name",
+  "enabled",
+  "priority",
+  "match_section",
+  "mapping_type",
+  "mapping_value",
+  "column_break_partner",
+  "sales_partner",
+  "commission_rate"
+ ],
+ "fields": [
+  {
+   "fieldname": "rule_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Rule Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "default": "100",
+   "description": "Lower number is evaluated first. On the first matching rule the Sales Partner is assigned.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Priority"
+  },
+  {
+   "fieldname": "match_section",
+   "fieldtype": "Section Break",
+   "label": "Match"
+  },
+  {
+   "description": "Which attribution signal to match on.",
+   "fieldname": "mapping_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Match On",
+   "options": "Discount Code\nUTM Source\nUTM Campaign\nUTM Medium\nMarketing Channel\nReferral URL",
+   "reqd": 1
+  },
+  {
+   "description": "Value to match (case-insensitive). Discount Code: exact code (EXTRA5). UTM Source/Campaign/Medium: exact value (ig, google). Marketing Channel: exact channel (Meta Ads, Google Ads). Referral URL: substring found in landing/referring URL.",
+   "fieldname": "mapping_value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Match Value",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_partner",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_partner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sales Partner",
+   "options": "Sales Partner",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Commission rate for this partner. If left at 0, the default rate from the Sales Partner master is used.",
+   "fieldname": "commission_rate",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Commission Rate"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-04 23:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "shopify",
+ "name": "Shopify Sales Partner Rule",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "priority",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "rule_name",
+ "track_changes": 1
+}

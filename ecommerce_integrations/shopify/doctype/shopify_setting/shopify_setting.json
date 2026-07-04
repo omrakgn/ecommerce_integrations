@@ -420,17 +420,18 @@
   },
   {
    "default": "0",
-   "description": "Enable automatic Sales Partner assignment based on discount codes or referral links",
+   "description": "Master switch. Rules are managed in the <b>Shopify Sales Partner Rule</b> list (discount code / UTM source / campaign / marketing channel → Sales Partner + commission).",
    "fieldname": "enable_sales_partner_mapping",
    "fieldtype": "Check",
    "label": "Enable Sales Partner Mapping"
   },
   {
    "depends_on": "eval:doc.enable_sales_partner_mapping",
-   "description": "Map discount codes or referral/UTM parameters to Sales Partners",
+   "description": "Deprecated: rules moved to the 'Shopify Sales Partner Rule' list. This table is kept only for data migration and is no longer used by the sync.",
    "fieldname": "sales_partner_mapping",
    "fieldtype": "Table",
-   "label": "Sales Partner Mapping",
+   "hidden": 1,
+   "label": "Sales Partner Mapping (deprecated)",
    "options": "Shopify Sales Partner Mapping"
   }
  ],
