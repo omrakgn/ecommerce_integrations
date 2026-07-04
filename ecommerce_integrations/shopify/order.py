@@ -1,5 +1,6 @@
 import json
 from typing import Literal, Optional
+from urllib.parse import urlparse, parse_qs
 
 import frappe
 from frappe import _
@@ -12,12 +13,20 @@ from ecommerce_integrations.shopify.constants import (
 	CUSTOMER_ID_FIELD,
 	DISCOUNT_CODES_FIELD,
 	EVENT_MAPPER,
+	LANDING_SITE_FIELD,
+	MARKETING_CHANNEL_FIELD,
 	ORDER_ID_FIELD,
 	ORDER_ITEM_DISCOUNT_FIELD,
 	ORDER_NUMBER_FIELD,
 	ORDER_STATUS_FIELD,
 	PAYMENT_METHOD_FIELD,
+	REFERRING_SITE_FIELD,
 	SETTING_DOCTYPE,
+	UTM_CAMPAIGN_FIELD,
+	UTM_CONTENT_FIELD,
+	UTM_MEDIUM_FIELD,
+	UTM_SOURCE_FIELD,
+	UTM_TERM_FIELD,
 )
 from ecommerce_integrations.shopify.customer import ShopifyCustomer
 from ecommerce_integrations.shopify.product import create_items_if_not_exist, get_item_code
@@ -140,6 +149,7 @@ def create_sales_order(shopify_order, setting, company=None):
 			"tax_category": get_dummy_tax_category(),
 			DISCOUNT_CODES_FIELD: discount_info.get("codes"),
 			PAYMENT_METHOD_FIELD: payment_method,
+			**get_marketing_attribution(shopify_order),
 		}
 		
 		# Discount is always taken from Shopify's per-item calculation
@@ -672,5 +682,96 @@ def _match_referral_pattern(url: str, referral_mappings: dict) -> dict | None:
 		# This handles both query params (ref=PARTNER) and path-based refs
 		if pattern in url_lower:
 			return partner_info
-	
+
 	return None
+
+
+# --- Marketing attribution ------------------------------------------------
+
+_SEARCH_ENGINE_HOSTS = ("google.", "bing.", "yahoo.", "duckduckgo.", "ecosia.", "yandex.")
+
+
+def get_marketing_attribution(shopify_order: dict) -> dict:
+	"""Extract marketing attribution from a Shopify order for storing on the Sales Order.
+
+	Shopify puts the first-touch URL in ``landing_site`` (a path + query string) and
+	the external referrer in ``referring_site``. UTM parameters live in the
+	landing_site query string; paid traffic also leaves click ids (``gclid`` /
+	``gad_source`` for Google Ads, ``fbclid`` for Meta) that plain UTM parsing
+	misses — so we look at those too and derive a single ``marketing_channel``.
+
+	Returns a dict keyed by the Shopify custom fieldnames, ready to splat into the
+	Sales Order document.
+	"""
+	landing = shopify_order.get("landing_site") or ""
+	referring = shopify_order.get("referring_site") or ""
+	params = parse_qs(urlparse(landing).query)
+
+	def first(key: str) -> str:
+		value = params.get(key)
+		return value[0].strip() if value and value[0] else ""
+
+	utm_source = first("utm_source")
+	utm_medium = first("utm_medium")
+
+	has_google_click = any(k in params for k in ("gclid", "gad_source", "gad_campaignid", "gbraid", "wbraid"))
+	has_meta_click = "fbclid" in params
+
+	channel = _classify_marketing_channel(
+		utm_source=utm_source,
+		utm_medium=utm_medium,
+		has_google_click=has_google_click,
+		has_meta_click=has_meta_click,
+		referrer=referring.lower(),
+		has_landing=bool(landing),
+	)
+
+	return {
+		MARKETING_CHANNEL_FIELD: channel,
+		UTM_SOURCE_FIELD: utm_source,
+		UTM_MEDIUM_FIELD: utm_medium,
+		UTM_CAMPAIGN_FIELD: first("utm_campaign"),
+		UTM_CONTENT_FIELD: first("utm_content"),
+		UTM_TERM_FIELD: first("utm_term"),
+		# Keep the raw URLs (truncated) as an audit trail for anything we didn't parse.
+		LANDING_SITE_FIELD: landing[:500],
+		REFERRING_SITE_FIELD: referring[:500],
+	}
+
+
+def _classify_marketing_channel(
+	utm_source: str,
+	utm_medium: str,
+	has_google_click: bool,
+	has_meta_click: bool,
+	referrer: str,
+	has_landing: bool,
+) -> str:
+	"""Collapse the various signals into one human-readable channel label."""
+	source = (utm_source or "").lower()
+
+	# Meta (Facebook / Instagram) — utm_source is tagged on ads, or an fbclid is present.
+	if has_meta_click or source in ("fb", "facebook", "ig", "instagram", "meta"):
+		return "Meta Ads"
+
+	# Google Ads — paid click ids.
+	if has_google_click:
+		return "Google Ads"
+
+	# Google organic / Shopping free listings / product sync.
+	if source == "google" or "google." in referrer:
+		return "Google Organic"
+
+	# Other search engines with no click id.
+	if any(engine in referrer for engine in _SEARCH_ENGINE_HOSTS):
+		return "Organic Search"
+
+	# An explicit UTM source we didn't special-case (e.g. newsletter, an affiliate).
+	if source:
+		return f"{utm_source} / {utm_medium}" if utm_medium else utm_source
+
+	# A real external referrer but no UTM.
+	if referrer and "myshopify" not in referrer:
+		return "Referral"
+
+	return "Direct / Unknown"

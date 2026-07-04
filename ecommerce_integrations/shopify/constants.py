@@ -40,5 +40,16 @@ ITEM_SELLING_RATE_FIELD = "shopify_selling_rate"
 DISCOUNT_CODES_FIELD = "shopify_discount_codes"
 PAYMENT_METHOD_FIELD = "shopify_payment_method"
 
+# marketing attribution (parsed from the Shopify order's landing_site / referring_site)
+MARKETING_SECTION_FIELD = "shopify_marketing_section"
+MARKETING_CHANNEL_FIELD = "shopify_marketing_channel"
+UTM_SOURCE_FIELD = "shopify_utm_source"
+UTM_MEDIUM_FIELD = "shopify_utm_medium"
+UTM_CAMPAIGN_FIELD = "shopify_utm_campaign"
+UTM_CONTENT_FIELD = "shopify_utm_content"
+UTM_TERM_FIELD = "shopify_utm_term"
+LANDING_SITE_FIELD = "shopify_landing_site"
+REFERRING_SITE_FIELD = "shopify_referring_site"
+
 # ERPNext already defines the default UOMs from Shopify but names are different
 WEIGHT_TO_ERPNEXT_UOM_MAP = {"kg": "Kg", "g": "Gram", "oz": "Ounce", "lb": "Pound"}
