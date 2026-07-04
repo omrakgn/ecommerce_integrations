@@ -56,9 +56,9 @@
    "reqd": 1
   },
   {
-   "description": "Value to match (case-insensitive). Discount Code: exact code (EXTRA5). UTM Source/Campaign/Medium: exact value (ig, google). Marketing Channel: exact channel (Meta Ads, Google Ads). Referral URL: substring found in landing/referring URL.",
+   "description": "Value to match (case-insensitive). Suggestions are values actually seen in your Sales Orders for the selected dimension; you can also type a new value. Discount Code: exact code (EXTRA5). UTM Source/Campaign/Medium: exact value (ig, google). Marketing Channel: exact channel (Meta Ads, Google Ads). Referral URL: substring found in landing/referring URL.",
    "fieldname": "mapping_value",
-   "fieldtype": "Data",
+   "fieldtype": "Autocomplete",
    "in_list_view": 1,
    "label": "Match Value",
    "reqd": 1
