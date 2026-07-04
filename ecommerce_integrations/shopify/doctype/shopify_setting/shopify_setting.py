@@ -22,6 +22,8 @@ from ecommerce_integrations.shopify.constants import (
 	ITEM_SELLING_RATE_FIELD,
 	LANDING_SITE_FIELD,
 	MARKETING_CHANNEL_FIELD,
+	MARKETPLACE_SHOPIFY_SECTION_FIELD,
+	MARKETPLACE_TAB_FIELD,
 	ORDER_ID_FIELD,
 	ORDER_ITEM_DISCOUNT_FIELD,
 	ORDER_NUMBER_FIELD,
@@ -116,9 +118,20 @@ class ShopifySetting(SettingController):
 		}
 
 
+def _last_standard_field(doctype: str) -> str:
+	"""Return the fieldname of the very last *standard* field of a DocType.
+
+	Used to anchor our custom "Marketplace" Tab Break AFTER every standard field,
+	so the new tab is appended at the end and no native field is pulled into it —
+	which is what corrupted the layout when we anchored on `amended_from`.
+	"""
+	rows = frappe.get_all("DocField", filters={"parent": doctype}, order_by="idx desc", pluck="fieldname", limit=1)
+	return rows[0] if rows else "amended_from"
+
+
 def setup_custom_fields():
 	# Show Shopify fields only on orders that actually came from Shopify. This is
-	# field-level visibility (safe), never a structural Section/Tab break.
+	# field-level visibility (safe), never disturbs the native form layout.
 	_SHOPIFY_ONLY = "eval:doc.shopify_order_id"
 
 	custom_fields = {
@@ -161,17 +174,31 @@ def setup_custom_fields():
 			)
 		],
 		"Sales Order": [
-			# IMPORTANT: do NOT add Section Break / Tab Break custom fields here.
-			# v15 Sales Order uses native tabs, and injecting structural breaks via
-			# custom fields corrupts that layout. Instead every Shopify field is a
-			# plain field gated with depends_on="eval:doc.shopify_order_id", so the
-			# whole group is hidden on non-Shopify orders and the form layout is
-			# never touched. (_SHOPIFY_ONLY is defined above this dict.)
+			# A single generic "Marketplace" tab holds every channel's fields so they
+			# don't clutter the main form. The Tab Break is anchored AFTER the last
+			# standard field (see _last_standard_field) so it is appended as the final
+			# tab and never pulls a native field into it — that was what corrupted the
+			# v15 layout previously. The whole tab is gated on shopify_order_id for now;
+			# extend the condition when Amazon/Bol attribution sections are added.
+			dict(
+				fieldname=MARKETPLACE_TAB_FIELD,
+				label="Marketplace",
+				fieldtype="Tab Break",
+				insert_after=_last_standard_field("Sales Order"),
+				depends_on=_SHOPIFY_ONLY,
+			),
+			dict(
+				fieldname=MARKETPLACE_SHOPIFY_SECTION_FIELD,
+				label="Shopify",
+				fieldtype="Section Break",
+				insert_after=MARKETPLACE_TAB_FIELD,
+				depends_on=_SHOPIFY_ONLY,
+			),
 			dict(
 				fieldname=ORDER_ID_FIELD,
 				label="Shopify Order Id",
 				fieldtype="Small Text",
-				insert_after="title",
+				insert_after=MARKETPLACE_SHOPIFY_SECTION_FIELD,
 				read_only=1,
 				print_hide=1,
 				depends_on=_SHOPIFY_ONLY,

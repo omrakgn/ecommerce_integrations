@@ -40,8 +40,13 @@ ITEM_SELLING_RATE_FIELD = "shopify_selling_rate"
 DISCOUNT_CODES_FIELD = "shopify_discount_codes"
 PAYMENT_METHOD_FIELD = "shopify_payment_method"
 
-# Sales Order "Shopify" tab that groups all Shopify-related fields
+# Deprecated structural fields from earlier attempts — deleted by patch, never recreated.
 SHOPIFY_TAB_FIELD = "shopify_tab"
+
+# Generic "Marketplace" tab on Sales Order that holds attribution for every channel
+# (Shopify now; Amazon / Bol can add their own sections under it later).
+MARKETPLACE_TAB_FIELD = "marketplace_tab"
+MARKETPLACE_SHOPIFY_SECTION_FIELD = "marketplace_shopify_section"
 
 # marketing attribution (parsed from the Shopify order's landing_site / referring_site)
 MARKETING_SECTION_FIELD = "shopify_marketing_section"
