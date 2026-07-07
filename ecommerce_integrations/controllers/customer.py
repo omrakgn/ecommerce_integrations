@@ -63,9 +63,12 @@ class EcommerceCustomer:
 		)
 		new_address.insert(ignore_mandatory=True)
 		
-		# Set as Primary Address on Customer if it's Billing type and no primary exists
+		# Set as Primary Address on Customer if it's Billing type and no primary exists.
+		# Also flag the Address itself (is_primary_address) — ERPNext's server-side
+		# address/contact fetch relies on this flag, not just the Customer field.
 		address_type = address.get("address_type", "Billing")
 		if address_type == "Billing" and not customer_doc.customer_primary_address:
+			new_address.db_set("is_primary_address", 1)
 			frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", new_address.name)
 
 	def create_customer_contact(self, contact: dict[str, str]) -> None:
@@ -83,8 +86,12 @@ class EcommerceCustomer:
 		)
 		new_contact.insert(ignore_mandatory=True)
 		
-		# Set as Primary Contact on Customer if no primary exists
+		# Set as Primary Contact on Customer if no primary exists. The Contact's
+		# is_primary_contact flag is what ERPNext's get_default_contact() looks at
+		# when auto-filling contact_person on Sales Orders/Invoices, so set it too —
+		# setting only the Customer field leaves the Sales Order contact empty.
 		if not customer_doc.customer_primary_contact:
+			new_contact.db_set("is_primary_contact", 1)
 			frappe.db.set_value("Customer", customer_doc.name, "customer_primary_contact", new_contact.name)
 		
 		# Set mobile_no and email_id on Customer for template compatibility

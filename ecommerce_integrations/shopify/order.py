@@ -178,6 +178,14 @@ def create_sales_order(shopify_order, setting, company=None):
 				adjusted_commission_rate = commission_rate * (1 + tax_rate)
 				so.commission_rate = adjusted_commission_rate
 
+		# ERPNext fills the Sales Order address server-side (from the Customer's
+		# customer_primary_address field) but NOT the contact — its
+		# get_default_contact() needs the Contact's is_primary_contact flag, which
+		# the customer sync doesn't always set. Populate the contact explicitly so
+		# the Address & Contact tab is complete. Guarded so a broken contact never
+		# blocks order creation.
+		_set_sales_order_contact(so)
+
 		if company:
 			so.update({"company": company, "status": "Draft"})
 		so.flags.ignore_mandatory = True
@@ -192,6 +200,29 @@ def create_sales_order(shopify_order, setting, company=None):
 		so = frappe.get_doc("Sales Order", so)
 
 	return so
+
+
+def _set_sales_order_contact(doc) -> None:
+	"""Populate contact_person + display fields from the Customer's primary contact.
+
+	Wrapped defensively: a missing/broken Contact must never block order creation.
+	"""
+	if not doc.customer:
+		return
+	try:
+		primary = frappe.db.get_value("Customer", doc.customer, "customer_primary_contact")
+		if not primary or not frappe.db.exists("Contact", primary):
+			return
+		doc.contact_person = primary
+		contact = frappe.get_doc("Contact", primary)
+		doc.contact_display = " ".join(filter(None, [contact.first_name, contact.last_name]))
+		doc.contact_email = contact.email_id
+		doc.contact_mobile = contact.mobile_no or contact.phone
+	except Exception:
+		frappe.log_error(
+			title="Shopify: could not set Sales Order contact",
+			message=frappe.get_traceback(),
+		)
 
 
 def get_order_items(order_items, setting, delivery_date, taxes_inclusive):
