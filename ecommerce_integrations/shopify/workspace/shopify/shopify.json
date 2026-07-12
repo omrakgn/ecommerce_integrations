@@ -24,14 +24,14 @@
  "module": "shopify",
  "name": "Shopify",
  "number_cards": [
-  {"number_card": "Shopify Integration Errors (This Week)", "label": "Shopify Integration Errors (This Week)"},
-  {"number_card": "Shopify Orders To Deliver", "label": "Shopify Orders To Deliver"},
-  {"number_card": "Shopify Orders Not Billed", "label": "Shopify Orders Not Billed"},
-  {"number_card": "Shopify Unmapped Attribution", "label": "Shopify Unmapped Attribution"},
-  {"number_card": "Shopify Orders (This Month)", "label": "Shopify Orders (This Month)"},
-  {"number_card": "Shopify Revenue (This Month)", "label": "Shopify Revenue (This Month)"},
-  {"number_card": "Shopify Avg Order Value (This Month)", "label": "Shopify Avg Order Value (This Month)"},
-  {"number_card": "Shopify Commission (This Month)", "label": "Shopify Commission (This Month)"}
+  {"number_card_name": "Shopify Integration Errors (This Week)", "label": "Shopify Integration Errors (This Week)"},
+  {"number_card_name": "Shopify Orders To Deliver", "label": "Shopify Orders To Deliver"},
+  {"number_card_name": "Shopify Orders Not Billed", "label": "Shopify Orders Not Billed"},
+  {"number_card_name": "Shopify Unmapped Attribution", "label": "Shopify Unmapped Attribution"},
+  {"number_card_name": "Shopify Orders (This Month)", "label": "Shopify Orders (This Month)"},
+  {"number_card_name": "Shopify Revenue (This Month)", "label": "Shopify Revenue (This Month)"},
+  {"number_card_name": "Shopify Avg Order Value (This Month)", "label": "Shopify Avg Order Value (This Month)"},
+  {"number_card_name": "Shopify Commission (This Month)", "label": "Shopify Commission (This Month)"}
  ],
  "owner": "Administrator",
  "parent_page": "",
