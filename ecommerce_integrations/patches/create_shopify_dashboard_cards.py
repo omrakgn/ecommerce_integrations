@@ -170,11 +170,17 @@ def execute():
 					"show_percentage_stats": 0,
 				}
 			).insert(ignore_permissions=True)
-			# Count cards must NOT carry a currency, otherwise the widget renders
-			# the count as money (e.g. "€8"). The controller auto-fills currency on
-			# currency-bearing doctypes, so clear it back out for Count cards.
+			# Count cards must NOT carry a currency or a report_function, otherwise
+			# the widget renders the count as money (e.g. "€8"). The controller
+			# auto-fills both (currency=company, report_function=Sum) on
+			# currency-bearing doctypes, so clear them for Count cards.
 			if card["function"] == "Count":
-				frappe.db.set_value("Number Card", doc.name, "currency", None, update_modified=False)
+				frappe.db.set_value(
+					"Number Card",
+					doc.name,
+					{"currency": None, "report_function": None},
+					update_modified=False,
+				)
 		except Exception:
 			frappe.log_error(title=f"Shopify dashboard: number card '{card['label']}'", message=frappe.get_traceback())
 
