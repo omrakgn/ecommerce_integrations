@@ -1,6 +1,13 @@
 {
- "charts": [],
- "content": "[{\"id\":\"sh_hdr_main\",\"type\":\"header\",\"data\":{\"text\":\"Shopify\",\"level\":4,\"col\":12}},{\"id\":\"sh_sc_setting\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Shopify Setting\",\"col\":3}},{\"id\":\"sh_sc_item\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ecommerce Items\",\"col\":3}},{\"id\":\"sh_sc_log\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Logs\",\"col\":3}},{\"id\":\"sh_sc_rule\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Partner Rules\",\"col\":3}},{\"id\":\"sh_hdr_attr\",\"type\":\"header\",\"data\":{\"text\":\"Marketing Attribution\",\"level\":4,\"col\":12}},{\"id\":\"sh_sc_attrval\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Values\",\"col\":3}},{\"id\":\"sh_sc_attrrep\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Overview\",\"col\":3}}]",
+ "charts": [
+  {"chart_name": "Shopify Revenue Trend", "label": "Shopify Revenue Trend"},
+  {"chart_name": "Shopify Orders by Channel", "label": "Shopify Orders by Channel"},
+  {"chart_name": "Shopify Orders by Status", "label": "Shopify Orders by Status"},
+  {"chart_name": "Shopify Orders by Payment Method", "label": "Shopify Orders by Payment Method"},
+  {"chart_name": "Shopify Commission by Partner", "label": "Shopify Commission by Partner"},
+  {"chart_name": "Shopify Orders by UTM Source", "label": "Shopify Orders by UTM Source"}
+ ],
+ "content": "[{\"id\":\"h_ops\",\"type\":\"header\",\"data\":{\"text\":\"Operations\",\"level\":4,\"col\":12}},{\"id\":\"n_err\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Integration Errors (This Week)\",\"col\":3}},{\"id\":\"n_del\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Orders To Deliver\",\"col\":3}},{\"id\":\"n_bill\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Orders Not Billed\",\"col\":3}},{\"id\":\"n_unmap\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Unmapped Attribution\",\"col\":3}},{\"id\":\"h_sales\",\"type\":\"header\",\"data\":{\"text\":\"Sales (This Month)\",\"level\":4,\"col\":12}},{\"id\":\"n_ord\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Orders (This Month)\",\"col\":3}},{\"id\":\"n_rev\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Revenue (This Month)\",\"col\":3}},{\"id\":\"n_aov\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Avg Order Value (This Month)\",\"col\":3}},{\"id\":\"n_comm\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Commission (This Month)\",\"col\":3}},{\"id\":\"c_rev\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Revenue Trend\",\"col\":12}},{\"id\":\"c_chan\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by Channel\",\"col\":6}},{\"id\":\"c_stat\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by Status\",\"col\":6}},{\"id\":\"h_mkt\",\"type\":\"header\",\"data\":{\"text\":\"Marketing\",\"level\":4,\"col\":12}},{\"id\":\"c_pay\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by Payment Method\",\"col\":6}},{\"id\":\"c_comm\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Commission by Partner\",\"col\":6}},{\"id\":\"c_utm\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by UTM Source\",\"col\":12}},{\"id\":\"h_short\",\"type\":\"header\",\"data\":{\"text\":\"Quick Access\",\"level\":4,\"col\":12}},{\"id\":\"s_set\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Shopify Setting\",\"col\":3}},{\"id\":\"s_item\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ecommerce Items\",\"col\":3}},{\"id\":\"s_log\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Logs\",\"col\":3}},{\"id\":\"s_rule\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Partner Rules\",\"col\":3}},{\"id\":\"s_attr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Values\",\"col\":3}},{\"id\":\"s_rep\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Overview\",\"col\":3}},{\"id\":\"h_list\",\"type\":\"header\",\"data\":{\"text\":\"Lists\",\"level\":4,\"col\":12}},{\"id\":\"q_ord\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Shopify Orders\",\"col\":6}},{\"id\":\"q_err\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Integration Errors\",\"col\":6}}]",
  "creation": "2026-07-05 00:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -12,55 +19,44 @@
  "is_hidden": 0,
  "label": "Shopify",
  "links": [],
- "modified": "2026-07-05 00:00:00.000000",
+ "modified": "2026-07-08 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "shopify",
  "name": "Shopify",
- "number_cards": [],
+ "number_cards": [
+  {"number_card": "Shopify Integration Errors (This Week)", "label": "Shopify Integration Errors (This Week)"},
+  {"number_card": "Shopify Orders To Deliver", "label": "Shopify Orders To Deliver"},
+  {"number_card": "Shopify Orders Not Billed", "label": "Shopify Orders Not Billed"},
+  {"number_card": "Shopify Unmapped Attribution", "label": "Shopify Unmapped Attribution"},
+  {"number_card": "Shopify Orders (This Month)", "label": "Shopify Orders (This Month)"},
+  {"number_card": "Shopify Revenue (This Month)", "label": "Shopify Revenue (This Month)"},
+  {"number_card": "Shopify Avg Order Value (This Month)", "label": "Shopify Avg Order Value (This Month)"},
+  {"number_card": "Shopify Commission (This Month)", "label": "Shopify Commission (This Month)"}
+ ],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
- "quick_lists": [],
+ "quick_lists": [
+  {
+   "label": "Recent Shopify Orders",
+   "document_type": "Sales Order",
+   "quick_list_filter": "[[\"Sales Order\",\"shopify_order_id\",\"is\",\"set\"]]"
+  },
+  {
+   "label": "Integration Errors",
+   "document_type": "Ecommerce Integration Log",
+   "quick_list_filter": "[[\"Ecommerce Integration Log\",\"status\",\"=\",\"Error\"]]"
+  }
+ ],
  "roles": [],
  "sequence_id": 20.0,
  "shortcuts": [
-  {
-   "color": "Grey",
-   "label": "Shopify Setting",
-   "link_to": "Shopify Setting",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "label": "Ecommerce Items",
-   "link_to": "Ecommerce Item",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "label": "Integration Logs",
-   "link_to": "Ecommerce Integration Log",
-   "type": "DocType"
-  },
-  {
-   "color": "Blue",
-   "label": "Sales Partner Rules",
-   "link_to": "Shopify Sales Partner Rule",
-   "type": "DocType"
-  },
-  {
-   "color": "Green",
-   "label": "Attribution Values",
-   "link_to": "Shopify Attribution Value",
-   "type": "DocType"
-  },
-  {
-   "color": "Green",
-   "doc_view": "Report",
-   "label": "Attribution Overview",
-   "link_to": "Shopify Attribution Overview",
-   "type": "Report"
-  }
+  {"color": "Grey", "label": "Shopify Setting", "link_to": "Shopify Setting", "type": "DocType"},
+  {"color": "Grey", "label": "Ecommerce Items", "link_to": "Ecommerce Item", "type": "DocType"},
+  {"color": "Grey", "label": "Integration Logs", "link_to": "Ecommerce Integration Log", "type": "DocType"},
+  {"color": "Blue", "label": "Sales Partner Rules", "link_to": "Shopify Sales Partner Rule", "type": "DocType"},
+  {"color": "Green", "label": "Attribution Values", "link_to": "Shopify Attribution Value", "type": "DocType"},
+  {"color": "Green", "doc_view": "Report", "label": "Attribution Overview", "link_to": "Shopify Attribution Overview", "type": "Report"}
  ],
  "title": "Shopify"
 }
