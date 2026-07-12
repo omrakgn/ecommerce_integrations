@@ -46,7 +46,7 @@
   {"color": "Grey", "label": "Integration Logs", "link_to": "Ecommerce Integration Log", "type": "DocType"},
   {"color": "Blue", "label": "Sales Partner Rules", "link_to": "Shopify Sales Partner Rule", "type": "DocType"},
   {"color": "Green", "label": "Attribution Values", "link_to": "Shopify Attribution Value", "type": "DocType"},
-  {"color": "Green", "doc_view": "Report", "label": "Attribution Overview", "link_to": "Shopify Attribution Overview", "type": "Report"}
+  {"color": "Green", "label": "Attribution Overview", "link_to": "Shopify Attribution Overview", "type": "Report"}
  ],
  "title": "Shopify"
 }
