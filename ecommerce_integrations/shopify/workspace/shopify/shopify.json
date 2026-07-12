@@ -1,13 +1,8 @@
 {
  "charts": [
-  {"chart_name": "Shopify Revenue Trend", "label": "Shopify Revenue Trend"},
-  {"chart_name": "Shopify Orders by Channel", "label": "Shopify Orders by Channel"},
-  {"chart_name": "Shopify Orders by Status", "label": "Shopify Orders by Status"},
-  {"chart_name": "Shopify Orders by Payment Method", "label": "Shopify Orders by Payment Method"},
-  {"chart_name": "Shopify Commission by Partner", "label": "Shopify Commission by Partner"},
-  {"chart_name": "Shopify Orders by UTM Source", "label": "Shopify Orders by UTM Source"}
+  {"chart_name": "Shopify Revenue Trend", "label": "Shopify Revenue Trend"}
  ],
- "content": "[{\"id\":\"s_set\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Shopify Setting\",\"col\":4}},{\"id\":\"s_item\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ecommerce Items\",\"col\":4}},{\"id\":\"s_log\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Logs\",\"col\":4}},{\"id\":\"s_rule\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Partner Rules\",\"col\":4}},{\"id\":\"s_attr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Values\",\"col\":4}},{\"id\":\"s_rep\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Overview\",\"col\":4}},{\"id\":\"h_ops\",\"type\":\"header\",\"data\":{\"text\":\"Operations\",\"level\":4,\"col\":12}},{\"id\":\"n_err\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Integration Errors (This Week)\",\"col\":3}},{\"id\":\"n_del\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Orders To Deliver\",\"col\":3}},{\"id\":\"n_bill\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Orders Not Billed\",\"col\":3}},{\"id\":\"n_unmap\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Unmapped Attribution\",\"col\":3}},{\"id\":\"h_sales\",\"type\":\"header\",\"data\":{\"text\":\"Sales \\u2014 This Month\",\"level\":4,\"col\":12}},{\"id\":\"n_ord\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Orders (This Month)\",\"col\":3}},{\"id\":\"n_rev\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Revenue (This Month)\",\"col\":3}},{\"id\":\"n_aov\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Avg Order Value (This Month)\",\"col\":3}},{\"id\":\"n_comm\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Shopify Commission (This Month)\",\"col\":3}},{\"id\":\"h_trend\",\"type\":\"header\",\"data\":{\"text\":\"Trends & Breakdown\",\"level\":4,\"col\":12}},{\"id\":\"c_rev\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Revenue Trend\",\"col\":12}},{\"id\":\"c_chan\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by Channel\",\"col\":6}},{\"id\":\"c_stat\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by Status\",\"col\":6}},{\"id\":\"c_pay\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by Payment Method\",\"col\":6}},{\"id\":\"c_comm\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Commission by Partner\",\"col\":6}},{\"id\":\"c_utm\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Orders by UTM Source\",\"col\":12}},{\"id\":\"h_recent\",\"type\":\"header\",\"data\":{\"text\":\"Recent\",\"level\":4,\"col\":12}},{\"id\":\"q_ord\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Shopify Orders\",\"col\":6}},{\"id\":\"q_err\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Integration Errors\",\"col\":6}}]",
+ "content": "[{\"id\":\"s_set\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Shopify Setting\",\"col\":4}},{\"id\":\"s_item\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ecommerce Items\",\"col\":4}},{\"id\":\"s_log\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Logs\",\"col\":4}},{\"id\":\"s_rule\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Partner Rules\",\"col\":4}},{\"id\":\"s_attr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Values\",\"col\":4}},{\"id\":\"s_rep\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attribution Overview\",\"col\":4}},{\"id\":\"h_trend\",\"type\":\"header\",\"data\":{\"text\":\"Revenue Trend\",\"level\":4,\"col\":12}},{\"id\":\"c_rev\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Shopify Revenue Trend\",\"col\":12}},{\"id\":\"h_recent\",\"type\":\"header\",\"data\":{\"text\":\"Recent\",\"level\":4,\"col\":12}},{\"id\":\"q_ord\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Shopify Orders\",\"col\":6}},{\"id\":\"q_err\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Integration Errors\",\"col\":6}}]",
  "creation": "2026-07-05 00:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -19,20 +14,11 @@
  "is_hidden": 0,
  "label": "Shopify",
  "links": [],
- "modified": "2026-07-08 12:00:00.000000",
+ "modified": "2026-07-08 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "shopify",
  "name": "Shopify",
- "number_cards": [
-  {"number_card_name": "Shopify Integration Errors (This Week)", "label": "Shopify Integration Errors (This Week)"},
-  {"number_card_name": "Shopify Orders To Deliver", "label": "Shopify Orders To Deliver"},
-  {"number_card_name": "Shopify Orders Not Billed", "label": "Shopify Orders Not Billed"},
-  {"number_card_name": "Shopify Unmapped Attribution", "label": "Shopify Unmapped Attribution"},
-  {"number_card_name": "Shopify Orders (This Month)", "label": "Shopify Orders (This Month)"},
-  {"number_card_name": "Shopify Revenue (This Month)", "label": "Shopify Revenue (This Month)"},
-  {"number_card_name": "Shopify Avg Order Value (This Month)", "label": "Shopify Avg Order Value (This Month)"},
-  {"number_card_name": "Shopify Commission (This Month)", "label": "Shopify Commission (This Month)"}
- ],
+ "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
