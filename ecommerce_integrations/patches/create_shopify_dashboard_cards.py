@@ -46,6 +46,7 @@ NUMBER_CARDS = [
 			["Sales Order", "company", "=", COMPANY],
 			["Sales Order", "per_billed", "<", 100],
 			["Sales Order", "docstatus", "=", 1],
+			["Sales Order", "status", "!=", "Closed"],
 		],
 	),
 	dict(
