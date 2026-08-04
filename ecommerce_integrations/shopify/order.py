@@ -365,7 +365,14 @@ def get_order_taxes(shopify_order, setting, items):
 		taxes_inclusive=taxes_inclusive,
 	)
 
-	if cint(setting.consolidate_taxes):
+	# Inclusive per-item tax rows are each "On Net Total", so on a multi-item order
+	# they compound on the FULL net total and double (or triple) the VAT — the grand
+	# total still matches Shopify because the item price is tax-inclusive, but the
+	# net/VAT split is wrong (VAT overstated). Inclusive taxes must therefore ALWAYS
+	# be consolidated into one row per account, regardless of the setting. Actual
+	# (non-inclusive) rows are summed and are correct either way, so honour the
+	# setting there.
+	if taxes_inclusive or cint(setting.consolidate_taxes):
 		taxes = consolidate_order_taxes(taxes, taxes_inclusive)
 
 	for row in taxes:
