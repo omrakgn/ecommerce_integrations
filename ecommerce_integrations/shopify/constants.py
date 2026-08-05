@@ -14,6 +14,7 @@ WEBHOOK_EVENTS = [
 	"orders/fulfilled",
 	"orders/cancelled",
 	"orders/partially_fulfilled",
+	"refunds/create",
 ]
 
 EVENT_MAPPER = {
@@ -21,6 +22,7 @@ EVENT_MAPPER = {
 	"orders/paid": "ecommerce_integrations.shopify.invoice.prepare_sales_invoice",
 	"orders/fulfilled": "ecommerce_integrations.shopify.fulfillment.prepare_delivery_note",
 	"orders/cancelled": "ecommerce_integrations.shopify.order.cancel_order",
+	"refunds/create": "ecommerce_integrations.shopify.refund.prepare_credit_note",
 	"orders/partially_fulfilled": "ecommerce_integrations.shopify.fulfillment.prepare_delivery_note",
 }
 
@@ -32,6 +34,7 @@ CUSTOMER_ID_FIELD = "shopify_customer_id"
 ORDER_ID_FIELD = "shopify_order_id"
 ORDER_NUMBER_FIELD = "shopify_order_number"
 ORDER_STATUS_FIELD = "shopify_order_status"
+REFUND_ID_FIELD = "shopify_refund_id"
 FULLFILLMENT_ID_FIELD = "shopify_fulfillment_id"
 SUPPLIER_ID_FIELD = "shopify_supplier_id"
 ADDRESS_ID_FIELD = "shopify_address_id"

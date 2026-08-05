@@ -31,6 +31,7 @@
   "column_break_27",
   "sync_delivery_note",
   "sync_sales_invoice",
+  "sync_refunds",
   "add_shipping_as_item",
   "consolidate_taxes",
   "section_break_22",
@@ -228,6 +229,14 @@
    "fieldtype": "Select",
    "label": "Sales Invoice Series",
    "mandatory_depends_on": "eval:doc.sync_sales_invoice"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.sync_sales_invoice==1",
+   "description": "Creates a Credit Note against the original invoice when Shopify refunds an order. Stock is not moved; receive returned goods on a return Delivery Note.",
+   "fieldname": "sync_refunds",
+   "fieldtype": "Check",
+   "label": "Create Credit Note on Shopify Refund"
   },
   {
    "fieldname": "section_break_22",

@@ -30,6 +30,7 @@ from ecommerce_integrations.shopify.constants import (
 	ORDER_STATUS_FIELD,
 	PAYMENT_METHOD_FIELD,
 	REFERRING_SITE_FIELD,
+	REFUND_ID_FIELD,
 	SUPPLIER_ID_FIELD,
 	UTM_CAMPAIGN_FIELD,
 	UTM_CONTENT_FIELD,
@@ -383,6 +384,17 @@ def setup_custom_fields():
 				insert_after=ORDER_ID_FIELD,
 				read_only=1,
 				print_hide=1,
+			),
+			# Set on Credit Notes only. Makes refund sync idempotent: a repeated
+			# refunds/create webhook cannot credit the same refund twice.
+			dict(
+				fieldname=REFUND_ID_FIELD,
+				label="Shopify Refund Id",
+				fieldtype="Data",
+				insert_after=ORDER_NUMBER_FIELD,
+				read_only=1,
+				print_hide=1,
+				no_copy=1,
 			),
 			dict(
 				fieldname=ORDER_STATUS_FIELD,
