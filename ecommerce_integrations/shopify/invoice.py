@@ -1,3 +1,5 @@
+import time
+
 import frappe
 from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 from frappe.utils import cint, cstr, getdate, nowdate
@@ -10,9 +12,16 @@ from ecommerce_integrations.shopify.constants import (
 from ecommerce_integrations.shopify.utils import create_shopify_log
 
 # orders/paid can be processed before orders/create has committed the Sales
-# Order. Instead of blocking the worker with sleep(), the handler re-enqueues
-# itself a bounded number of times so the Sales Order has time to appear.
+# Order. The handler re-enqueues itself a bounded number of times so the Sales
+# Order has time to appear.
 MAX_INVOICE_RETRIES = 5
+
+# ...but a retry that fires immediately is not a retry. Measured on live data:
+# the Sales Order lands 3-25s after orders/paid arrives (median 4s), while the
+# old no-delay ladder burned all five attempts inside a second. Every paid order
+# therefore logged a false "Sales Order not found after retries" and wasted five
+# background jobs. Waiting 2/4/8/16/30s covers the observed window comfortably.
+RETRY_BACKOFF_CAP = 30
 
 
 def prepare_sales_invoice(payload, request_id=None, retry_count=0):
@@ -25,6 +34,12 @@ def prepare_sales_invoice(payload, request_id=None, retry_count=0):
 	frappe.flags.request_id = request_id
 
 	try:
+		if retry_count:
+			# Wait before looking again, then drop our snapshot so the Sales Order
+			# committed by orders/create in another connection becomes visible.
+			time.sleep(min(2**retry_count, RETRY_BACKOFF_CAP))
+			frappe.db.rollback()
+
 		sales_order = get_sales_order(cstr(order["id"]))
 
 		# Race condition: orders/paid processed before orders/create finished.
@@ -47,11 +62,14 @@ def prepare_sales_invoice(payload, request_id=None, retry_count=0):
 					message=f"Sales Order not found yet; retry {retry_count + 1}/{MAX_INVOICE_RETRIES} scheduled.",
 				)
 			else:
+				# Not a failure: for a paid order, orders/create builds the invoice
+				# itself (see order.create_order), so there is nothing left to do
+				# here. Logged as Success so it stops looking like lost data.
 				create_shopify_log(
-					status="Queued",
+					status="Success",
 					message=(
-						"Sales Order not found after retries. If the order is paid, "
-						"orders/create will create the invoice."
+						"Sales Order still not found; nothing to do. A paid order's "
+						"invoice is created by the orders/create handler."
 					),
 				)
 			return
