@@ -193,20 +193,38 @@ def get_mode_of_payment(payment_gateway: str, setting) -> str | None:
 	return None
 
 
+def get_mode_of_payment_account(mode_of_payment: str, company: str) -> str | None:
+	"""Account configured for this Mode of Payment in this company, if any."""
+	if not mode_of_payment or not company:
+		return None
+	return frappe.db.get_value(
+		"Mode of Payment Account",
+		{"parent": mode_of_payment, "company": company},
+		"default_account",
+	)
+
+
 def make_payment_entry_against_sales_invoice(doc, setting, posting_date=None, payment_gateway=None):
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
-	payment_entry = get_payment_entry(doc.doctype, doc.name, bank_account=setting.cash_bank_account)
+	# Resolve the Mode of Payment *before* building the entry, so its account can
+	# be handed to get_payment_entry. Assigning mode_of_payment afterwards does
+	# NOT move the money: ERPNext derives paid_to from the Mode of Payment only in
+	# the browser (payment_entry.js), never in validate(). Setting it server-side
+	# left every gateway posting to setting.cash_bank_account, so the per-gateway
+	# accounts (Klarna, PayPal, ...) stayed empty while the entry was labelled
+	# correctly.
+	mode_of_payment = get_mode_of_payment(payment_gateway, setting) if payment_gateway else None
+	bank_account = get_mode_of_payment_account(mode_of_payment, doc.company) or setting.cash_bank_account
+
+	payment_entry = get_payment_entry(doc.doctype, doc.name, bank_account=bank_account)
 	payment_entry.flags.ignore_mandatory = True
 	payment_entry.reference_no = doc.name
 	payment_entry.posting_date = posting_date or nowdate()
 	payment_entry.reference_date = posting_date or nowdate()
-	
-	# Set Mode of Payment if available
-	if payment_gateway:
-		mode_of_payment = get_mode_of_payment(payment_gateway, setting)
-		if mode_of_payment:
-			payment_entry.mode_of_payment = mode_of_payment
-	
+
+	if mode_of_payment:
+		payment_entry.mode_of_payment = mode_of_payment
+
 	payment_entry.insert(ignore_permissions=True)
 	payment_entry.submit()
