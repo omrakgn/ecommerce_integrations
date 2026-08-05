@@ -91,8 +91,27 @@ def get_current_domain_name() -> str:
 	"""
 	if frappe.conf.developer_mode and frappe.conf.localtunnel_url:
 		return frappe.conf.localtunnel_url
-	else:
+
+	if getattr(frappe.local, "request", None):
 		return frappe.request.host
+
+	# No HTTP request in scope (bench console, scheduled job). Reading
+	# frappe.request.host here raises "object is not bound", which made webhook
+	# registration impossible outside the browser. Fall back to the site's own
+	# configured URL; the browser path above is untouched.
+	from urllib.parse import urlparse
+
+	from frappe.utils import get_url
+
+	host = urlparse(get_url()).netloc
+	if not host:
+		frappe.throw(
+			_(
+				"Cannot determine the site domain for the Shopify callback URL. "
+				"Save Shopify Setting from the browser instead."
+			)
+		)
+	return host
 
 
 def get_callback_url() -> str:
