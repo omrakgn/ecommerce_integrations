@@ -37,6 +37,7 @@ from ecommerce_integrations.shopify.constants import (
 	UTM_MEDIUM_FIELD,
 	UTM_SOURCE_FIELD,
 	UTM_TERM_FIELD,
+	WEBHOOK_EVENTS,
 )
 from ecommerce_integrations.shopify.utils import (
 	ensure_old_connector_is_disabled,
@@ -76,6 +77,19 @@ class ShopifySetting(SettingController):
 
 			for webhook in new_webhooks:
 				self.append("webhooks", {"webhook_id": webhook.id, "method": webhook.topic})
+
+		elif self.is_enabled():
+			# An app update that adds a topic to WEBHOOK_EVENTS would otherwise never
+			# reach Shopify: this branch used to do nothing, and the first branch is
+			# skipped as soon as any webhook is registered. Register just the missing
+			# ones so saving the settings is enough to pick a new topic up.
+			registered = {w.method for w in self.webhooks}
+			missing = [topic for topic in WEBHOOK_EVENTS if topic not in registered]
+			if missing:
+				for webhook in connection.register_missing_webhooks(
+					self.shopify_url, self.get_password("password"), missing
+				):
+					self.append("webhooks", {"webhook_id": webhook.id, "method": webhook.topic})
 
 		elif not self.is_enabled():
 			connection.unregister_webhooks(self.shopify_url, self.get_password("password"))

@@ -37,15 +37,12 @@ def temp_shopify_session(func):
 	return wrapper
 
 
-def register_webhooks(shopify_url: str, password: str) -> list[Webhook]:
-	"""Register required webhooks with shopify and return registered webhooks."""
+def _create_webhooks(shopify_url: str, password: str, topics) -> list[Webhook]:
+	"""Create the given webhook topics; return the ones Shopify accepted."""
 	new_webhooks = []
 
-	# clear all stale webhooks matching current site url before registering new ones
-	unregister_webhooks(shopify_url, password)
-
 	with Session.temp(shopify_url, API_VERSION, password):
-		for topic in WEBHOOK_EVENTS:
+		for topic in topics:
 			webhook = Webhook.create({"topic": topic, "address": get_callback_url(), "format": "json"})
 
 			if webhook.is_valid():
@@ -58,6 +55,23 @@ def register_webhooks(shopify_url: str, password: str) -> list[Webhook]:
 				)
 
 	return new_webhooks
+
+
+def register_webhooks(shopify_url: str, password: str) -> list[Webhook]:
+	"""Register every required webhook, replacing any stale ones for this site."""
+	# clear all stale webhooks matching current site url before registering new ones
+	unregister_webhooks(shopify_url, password)
+	return _create_webhooks(shopify_url, password, WEBHOOK_EVENTS)
+
+
+def register_missing_webhooks(shopify_url: str, password: str, topics) -> list[Webhook]:
+	"""Register only these topics, leaving the already-registered ones untouched.
+
+	Used when an app update adds a topic to WEBHOOK_EVENTS: re-registering
+	everything would tear down working webhooks and drop any order that arrived
+	during the gap.
+	"""
+	return _create_webhooks(shopify_url, password, topics)
 
 
 def unregister_webhooks(shopify_url: str, password: str) -> None:
