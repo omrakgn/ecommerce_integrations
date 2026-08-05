@@ -147,7 +147,13 @@ def create_sales_invoice(shopify_order, setting, so):
 		if sales_invoice.grand_total > 0:
 			# Get payment method from Shopify order
 			payment_gateway = get_payment_gateway(shopify_order)
-			make_payment_entry_against_sales_invoice(sales_invoice, setting, posting_date, payment_gateway)
+			make_payment_entry_against_sales_invoice(
+				sales_invoice,
+				setting,
+				posting_date,
+				payment_gateway,
+				gateways=get_payment_gateway_names(shopify_order),
+			)
 
 		if shopify_order.get("note"):
 			sales_invoice.add_comment(text=f"Order Note: {shopify_order.get('note')}")
@@ -158,22 +164,24 @@ def set_cost_center(items, cost_center):
 		item.cost_center = cost_center
 
 
-def get_payment_gateway(shopify_order) -> str:
-	"""Extract payment gateway name from Shopify order.
+def get_payment_gateway_names(shopify_order) -> list:
+	"""Every gateway Shopify reported for this order, in its own order."""
+	return shopify_order.get("payment_gateway_names") or []
 
-	Shopify can report multiple gateways for a single order (e.g. split payment:
-	gift card + card). We use the first one for the Mode of Payment but log the
-	rest so a split payment doesn't silently lose information.
+
+def get_payment_gateway(shopify_order) -> str:
+	"""Primary payment gateway — the one the Mode of Payment is derived from.
+
+	Shopify can report several gateways for one order (gift card + card, or
+	Shopify Payments + Klarna). ERPNext gets a single Payment Entry, so the whole
+	amount lands on the first gateway's account. That is an accounting error the
+	operator has to split by hand, which is why it is surfaced rather than logged
+	to a file nobody reads — see make_payment_entry_against_sales_invoice.
 	"""
-	payment_gateway_names = shopify_order.get("payment_gateway_names") or []
+	payment_gateway_names = get_payment_gateway_names(shopify_order)
 	if not payment_gateway_names:
 		return ""
-	if len(payment_gateway_names) > 1:
-		frappe.logger("shopify").info(
-			f"Order {shopify_order.get('name')} has multiple payment gateways "
-			f"{payment_gateway_names}; using '{payment_gateway_names[0]}' for Mode of Payment."
-		)
-	return payment_gateway_names[0]  # Primary payment method
+	return payment_gateway_names[0]
 
 
 def get_mode_of_payment(payment_gateway: str, setting) -> str | None:
@@ -222,7 +230,9 @@ def get_mode_of_payment_account(mode_of_payment: str, company: str) -> str | Non
 	)
 
 
-def make_payment_entry_against_sales_invoice(doc, setting, posting_date=None, payment_gateway=None):
+def make_payment_entry_against_sales_invoice(
+	doc, setting, posting_date=None, payment_gateway=None, gateways=None
+):
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
 	# Resolve the Mode of Payment *before* building the entry, so its account can
@@ -243,6 +253,18 @@ def make_payment_entry_against_sales_invoice(doc, setting, posting_date=None, pa
 
 	if mode_of_payment:
 		payment_entry.mode_of_payment = mode_of_payment
+
+	# Split payment: ERPNext gets one Payment Entry, so the whole amount sits on
+	# the first gateway's account. Say so on the entry itself and in Error Log,
+	# because nothing else would reveal it until someone reconciles the accounts.
+	if gateways and len(gateways) > 1:
+		note = (
+			f"Shopify split payment across: {', '.join(gateways)}. "
+			f"The full amount is posted to the account of '{gateways[0]}'. "
+			f"Split it manually across the other gateways' accounts."
+		)
+		payment_entry.remarks = note
+		frappe.log_error(title="Shopify: split payment posted to one account", message=f"{doc.name}: {note}")
 
 	payment_entry.insert(ignore_permissions=True)
 	payment_entry.submit()
