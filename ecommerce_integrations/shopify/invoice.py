@@ -80,12 +80,35 @@ def prepare_sales_invoice(payload, request_id=None, retry_count=0):
 		create_shopify_log(status="Error", exception=e, rollback=True)
 
 
+def _invoice_already_exists(so, shopify_order):
+	"""
+	Whether this Shopify order already has an invoice, safe against a second
+	worker asking at the same moment.
+
+	Both webhook handlers reach invoice creation for a paid order: orders/create
+	builds it inline, and orders/paid builds it once the Sales Order appears.
+	On a busy store they land within a second of each other — measured at 1.0s
+	and 1.8s apart on two live orders that each ended up with two submitted
+	invoices for the same sale.
+
+	A plain read cannot see a row the other transaction has not committed yet,
+	so both saw "no invoice" and both created one. Taking a row lock on the
+	Sales Order first serialises them: the second waits for the first to
+	commit, then reads the invoice it wrote.
+	"""
+	frappe.db.get_value("Sales Order", so.name, "name", for_update=True)
+	return bool(
+		frappe.db.get_value("Sales Invoice", {ORDER_ID_FIELD: shopify_order.get("id")}, "name")
+	)
+
+
 def create_sales_invoice(shopify_order, setting, so):
+	# Cheap checks first; the lock is taken only when an invoice is actually due.
 	if (
-		not frappe.db.get_value("Sales Invoice", {ORDER_ID_FIELD: shopify_order.get("id")}, "name")
+		cint(setting.sync_sales_invoice)
 		and so.docstatus == 1
 		and not so.per_billed
-		and cint(setting.sync_sales_invoice)
+		and not _invoice_already_exists(so, shopify_order)
 	):
 		posting_date = getdate(shopify_order.get("created_at")) or nowdate()
 
