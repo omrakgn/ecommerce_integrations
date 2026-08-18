@@ -112,11 +112,22 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 		"Delivery Note", dn.name, FULLFILLMENT_ID_FIELD, str(fulfillment["id"]),
 		update_modified=False,
 	)
+	# Çok koli, tek takip numarası. 2024-01'de bir fulfillment tek numara taşıyor;
+	# hepsini bildirmek parça başına ayrı fulfillment açmayı ve kalemleri Shopify'ın
+	# fulfillment_order satırlarıyla eşleştirmeyi gerektiriyor. Yapılmadı — ama
+	# hangilerinin gitmediği kayda geçiyor, yoksa müşteri iki kutudan yalnız birini
+	# takip edebildiğinde sebebi hiçbir yerde görünmez.
+	note = ""
+	if len(tracking_numbers) > 1:
+		note = " — only the first of {0} tracking numbers was sent; the others ({1}) are not on the Shopify order".format(
+			len(tracking_numbers), ", ".join(tracking_numbers[1:])
+		)
+
 	create_shopify_log(
 		status="Success",
 		method="ecommerce_integrations.shopify.tracking.push_tracking",
 		message=f"Shopify order {order_id} fulfilled from {shipment.name} "
-		f"({tracking_numbers[0] if tracking_numbers else 'no tracking'})",
+		f"({tracking_numbers[0] if tracking_numbers else 'no tracking'}){note}",
 	)
 	return {"delivery_note": dn.name, "fulfillment_id": fulfillment["id"]}
 
