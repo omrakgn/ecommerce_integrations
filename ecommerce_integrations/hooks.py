@@ -125,6 +125,10 @@ doc_events = {
 	},
 	"Item Price": {"on_change": "ecommerce_integrations.utils.price_list.discard_item_prices"},
 	"Pick List": {"validate": "ecommerce_integrations.unicommerce.pick_list.validate"},
+	# Kargo etiketi ERPNext'te üretildiğinde Shopify'ın haberi olmuyor: entegrasyon
+	# SendCloud'da ve o yoldan geçmeyen etiketler siparişi "unfulfilled" bırakıyor.
+	# Shipment standart bir DocType, dolayısıyla erpnext_shipping'e bağımlılık yok.
+	"Shipment": {"on_submit": "ecommerce_integrations.shopify.tracking.push_tracking_on_submit"},
 	"Sales Invoice": {
 		"on_submit": "ecommerce_integrations.unicommerce.invoice.on_submit",
 		"on_cancel": "ecommerce_integrations.unicommerce.invoice.on_cancel",

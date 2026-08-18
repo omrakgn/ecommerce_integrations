@@ -53,6 +53,9 @@
   "warehouse",
   "price_list",
   "update_erpnext_stock_levels_to_shopify",
+  "tracking_push_section",
+  "push_tracking_to_shopify",
+  "notify_customer_on_tracking_push",
   "inventory_sync_frequency",
   "fetch_shopify_locations",
   "shopify_warehouse_mapping",
@@ -310,6 +313,26 @@
    "label": "Update ERPNext stock levels to Shopify"
   },
   {
+   "fieldname": "tracking_push_section",
+   "fieldtype": "Section Break",
+   "label": "Tracking to Shopify"
+  },
+  {
+   "default": "0",
+   "fieldname": "push_tracking_to_shopify",
+   "fieldtype": "Check",
+   "label": "Send tracking to Shopify from ERPNext",
+   "description": "Off by default. Shopify normally hears about a shipment from SendCloud; labels built in ERPNext never pass through it, so the order stays unfulfilled. Turn this on and submitting a Shipment fulfils the Shopify order with its tracking number. Leave it off where SendCloud already does this — otherwise the order is fulfilled twice."
+  },
+  {
+   "default": "0",
+   "depends_on": "push_tracking_to_shopify",
+   "fieldname": "notify_customer_on_tracking_push",
+   "fieldtype": "Check",
+   "label": "Email the customer",
+   "description": "Let Shopify send its shipping notification. Separate from the switch above because reporting a parcel and writing to the customer are different decisions."
+  },
+  {
    "default": "0",
    "fieldname": "is_old_data_migrated",
    "fieldtype": "Check",
@@ -447,7 +470,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-10-24 10:38:49.247431",
+ "modified": "2026-08-18 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "shopify",
  "name": "Shopify Setting",
