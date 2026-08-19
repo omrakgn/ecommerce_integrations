@@ -48,17 +48,24 @@ def push_tracking(shipment):
 	if not doc.get("awb_number"):
 		return {"skipped": "no tracking number"}
 
-	results = []
+	# Aynı irsaliye tabloda birden fazla satırda görünüyor — koli başına bir satır.
+	# Her satır için ayrı çağrı yapmak gereksiz: ilk çağrı fulfillment id'yi yazar,
+	# ikincisi onu görüp çıkar. Yine de tekilleştiriliyor, çünkü "iki kez denendi"
+	# ile "iki kez bildirildi" arasındaki farkı logdan okumak zor.
+	seen = []
 	for row in doc.get("shipment_delivery_note") or []:
-		if not row.delivery_note:
-			continue
+		if row.delivery_note and row.delivery_note not in seen:
+			seen.append(row.delivery_note)
+
+	results = []
+	for delivery_note in seen:
 		try:
-			outcome = _fulfil_delivery_note(setting, doc, row.delivery_note)
+			outcome = _fulfil_delivery_note(setting, doc, delivery_note)
 		except Exception:
 			create_shopify_log(
 				status="Error",
 				method="ecommerce_integrations.shopify.tracking.push_tracking",
-				message=f"Shipment {doc.name}, Delivery Note {row.delivery_note}",
+				message=f"Shipment {doc.name}, Delivery Note {delivery_note}",
 			)
 			continue
 		if outcome:
@@ -406,7 +413,8 @@ def push_unsent_tracking(days=SCAN_DAYS, limit=50, dry_run=True):
 				continue  # Shopify siparişi değil
 			if state.get(FULLFILLMENT_ID_FIELD):
 				continue  # zaten bildirilmiş
-			wanted.append(delivery_note)
+			if delivery_note not in wanted:
+				wanted.append(delivery_note)
 
 		if not wanted:
 			continue
