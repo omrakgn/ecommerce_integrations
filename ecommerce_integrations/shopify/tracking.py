@@ -28,8 +28,27 @@ from ecommerce_integrations.shopify.utils import create_shopify_log
 
 
 def push_tracking_on_submit(doc, method=None):
-	"""Hook: a Shipment was submitted, tell Shopify about it."""
+	"""Hook: a Shipment was submitted, tell Shopify about it.
+
+	Rarely the right moment on its own — the label is usually bought after the
+	submit — but harmless, and correct for a shipment whose number is already
+	there.
+	"""
 	push_tracking(doc.name)
+
+
+def push_tracking_on_label(shipment=None, **kwargs):
+	"""Hook: `shipment_label_created` — the tracking number now exists.
+
+	This is the moment that matters. `awb_number` is written after the submit and
+	with `db_set`, so no document event sees it; `erpnext_shipping` announces it
+	instead and this listens. Without it Shopify learned about a parcel only on
+	the next hourly scan, up to an hour after the label was printed.
+
+	Absent that app, the hook is never fired and nothing here runs.
+	"""
+	if shipment:
+		push_tracking(shipment)
 
 
 @frappe.whitelist()

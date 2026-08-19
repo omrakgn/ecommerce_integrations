@@ -138,6 +138,10 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
+# erpnext_shipping bir etiket yazdığında haber veriyor. Kancanın adı ona ait;
+# burada yalnız dinliyoruz, o app kurulu değilse hiç tetiklenmez.
+shipment_label_created = ["ecommerce_integrations.shopify.tracking.push_tracking_on_label"]
+
 scheduler_events = {
 	"all": ["ecommerce_integrations.shopify.inventory.update_inventory_on_shopify"],
 	"daily": [
