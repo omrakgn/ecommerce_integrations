@@ -294,11 +294,16 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 	that parcel's number.
 	"""
 	notify = setting.get("notify_customer_on_tracking_push")
+	carriers = _parcel_carriers(shipment)
 	created = []
-	for index, (_parcel_no, wanted) in enumerate(parcels):
+	for index, (parcel_no, wanted) in enumerate(parcels):
 		claimed = _claim(available, wanted)
 		if not claimed:
 			continue
+		# Kolinin kendi taşıyıcısı. Gönderi başlığındaki `carrier`, koliler ayrı
+		# taşıyıcılarla gittiğinde "DPD, FEDEX" gibi birleşik bir metin oluyor;
+		# onu Shopify'a yazmak takip bağlantısını çalışmaz hâle getirir.
+		carrier = carriers.get(parcel_no) or shipment.get("carrier")
 		for fulfillment_id in _post_fulfillment(
 			setting, claimed,
 			numbers[index] if index < len(numbers) else None,
@@ -306,8 +311,24 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 			notify,
 		):
 			created.append(fulfillment_id)
-			_set_company(setting, fulfillment_id, shipment.get("carrier"))
+			_set_company(setting, fulfillment_id, carrier)
 	return created
+
+
+def _parcel_carriers(shipment):
+	"""{parcel_no: carrier} where each box says who carried it.
+
+	Boxes can go with different carriers — a 2 kg pillow on a parcel service and
+	a 32 kg mattress on freight — and the shipment header then holds them joined
+	together. Sending that joined string to Shopify as the carrier name leaves
+	the customer with a tracking link that resolves to nothing.
+	"""
+	carriers = {}
+	for index, row in enumerate(shipment.get("shipment_parcel") or [], start=1):
+		name = row.get("custom_shipping_carrier")
+		if name:
+			carriers[index] = name
+	return carriers
 
 
 def _fulfil_whole(setting, shipment, available, numbers, urls):
