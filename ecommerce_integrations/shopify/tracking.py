@@ -255,7 +255,7 @@ def _claim(available, wanted):
 	return claimed
 
 
-def _post_fulfillment(setting, claimed, number, url, notify):
+def _post_fulfillment(setting, claimed, number, url, notify, carrier=None):
 	"""One fulfillment per fulfillment order. Returns the ids created.
 
 	Not one fulfillment spanning several. Splitting an order in Shopify — after
@@ -275,7 +275,12 @@ def _post_fulfillment(setting, claimed, number, url, notify):
 				"line_items_by_fulfillment_order": [
 					{"fulfillment_order_id": fo_id, "fulfillment_order_line_items": items}
 				],
-				"tracking_info": {"number": number, "url": url},
+				# Taşıyıcı adı burada gidiyor, ayrı bir güncelleme çağrısında değil.
+				# `fulfillments/{id}/update_tracking.json` `tracking_info`'yu
+				# birleştirmiyor, **değiştiriyor**: yalnız `company` gönderen bir
+				# çağrı numarayı ve bağlantıyı siliyor. Shopify'da fulfillment
+				# oluşup takip numarasının boş kalmasının sebebi buydu.
+				"tracking_info": {"number": number, "url": url, "company": carrier},
 				"notify_customer": bool(notify),
 			}
 		}
@@ -309,9 +314,9 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 			numbers[index] if index < len(numbers) else None,
 			urls[index] if index < len(urls) else None,
 			notify,
+			carrier,
 		):
 			created.append(fulfillment_id)
-			_set_company(setting, fulfillment_id, carrier)
 	return created
 
 
@@ -336,34 +341,79 @@ def _fulfil_whole(setting, shipment, available, numbers, urls):
 	for line in available:
 		wanted[line["item_code"]] = wanted.get(line["item_code"], 0) + line["qty"]
 
-	created = _post_fulfillment(
+	carriers = _parcel_carriers(shipment)
+	# Tek fulfillment açılıyorsa taşıyıcı da tek olmalı; koliler ayrı taşıyıcılarla
+	# gittiyse başlıktaki birleşik metin yerine ilk kolinin taşıyıcısı yazılıyor.
+	carrier = carriers.get(1) or shipment.get("carrier")
+	return _post_fulfillment(
 		setting, _claim(available, wanted),
 		numbers[0] if numbers else None,
 		urls[0] if urls else None,
 		setting.get("notify_customer_on_tracking_push"),
+		carrier,
 	)
-	for fulfillment_id in created:
-		_set_company(setting, fulfillment_id, shipment.get("carrier"))
-	return created
 
 
-def _set_company(setting, fulfillment_id, carrier):
-	"""Name the carrier in a second call.
+@frappe.whitelist()
+def repair_tracking(shipment, notify=0):
+	"""Put the tracking numbers back on fulfillments that lost them.
 
-	Sending an unrecognised company name while creating the fulfillment can leave
-	Shopify without a working tracking link. Set separately, and ignored on
-	failure: by then the parcel is already reported, and a missing carrier name is
-	a smaller loss than an error on a shipment that has left.
+	Needed because of a fault since fixed: the carrier name used to be set in a
+	second call to `update_tracking`, and that endpoint **replaces** tracking
+	info rather than merging it — sending only the company wiped the number and
+	the link. Fulfillments created before the fix carry a carrier and nothing
+	else.
+
+	The ids stored on the delivery note are in parcel order, the same order the
+	tracking numbers are joined in, so each fulfillment gets its own number back.
 	"""
-	if not carrier:
-		return
-	try:
-		_post(
-			setting, f"fulfillments/{fulfillment_id}/update_tracking.json",
-			{"fulfillment": {"tracking_info": {"company": carrier}, "notify_customer": False}},
-		)
-	except Exception:
-		pass
+	notify = frappe.parse_json(notify) if isinstance(notify, str) else notify
+	setting = frappe.get_cached_doc(SETTING_DOCTYPE)
+	doc = frappe.get_doc("Shipment", shipment)
+
+	numbers = [t.strip() for t in (doc.awb_number or "").split(",") if t.strip()]
+	urls = [u.strip() for u in (doc.tracking_url or "").split(",") if u.strip()]
+	carriers = _parcel_carriers(doc)
+
+	repaired = []
+	for row in doc.get("shipment_delivery_note") or []:
+		if not row.delivery_note:
+			continue
+		stored = frappe.db.get_value("Delivery Note", row.delivery_note, FULLFILLMENT_ID_FIELD)
+		if not stored:
+			continue
+		ids = [f.strip() for f in str(stored).split(",") if f.strip()]
+		for index, fulfillment_id in enumerate(ids):
+			_update_tracking(
+				setting,
+				fulfillment_id,
+				numbers[index] if index < len(numbers) else None,
+				urls[index] if index < len(urls) else None,
+				carriers.get(index + 1) or doc.get("carrier"),
+				notify,
+			)
+			repaired.append(fulfillment_id)
+		break  # aynı irsaliye koli başına tekrarlıyor
+
+	return {"repaired": repaired}
+
+
+def _update_tracking(setting, fulfillment_id, number, url, carrier, notify=False):
+	"""Rewrite a fulfillment's tracking info in full.
+
+	Every field goes every time. This endpoint replaces the object, so a partial
+	update is a deletion of whatever was left out — which is how the numbers went
+	missing in the first place.
+	"""
+	_post(
+		setting, f"fulfillments/{fulfillment_id}/update_tracking.json",
+		{
+			"fulfillment": {
+				"tracking_info": {"number": number, "url": url, "company": carrier},
+				"notify_customer": bool(notify),
+			}
+		},
+	)
 
 
 def _get_fulfillment_orders(setting, order_id):
