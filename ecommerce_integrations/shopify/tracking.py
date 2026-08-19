@@ -58,20 +58,32 @@ def push_tracking(shipment):
 			seen.append(row.delivery_note)
 
 	results = []
+	errors = []
 	for delivery_note in seen:
 		try:
 			outcome = _fulfil_delivery_note(setting, doc, delivery_note)
-		except Exception:
+		except Exception as exception:
+			# Hatanın kendisi loga yazılıyor. Önceki hâli yalnız gönderi ve
+			# irsaliye adını kaydediyordu, yani "bir şey oldu" diyip ne olduğunu
+			# söylemiyordu — teşhis baştan yapılmak zorunda kalıyordu.
 			create_shopify_log(
 				status="Error",
 				method="ecommerce_integrations.shopify.tracking.push_tracking",
-				message=f"Shipment {doc.name}, Delivery Note {delivery_note}",
+				message=f"Shipment {doc.name}, Delivery Note {delivery_note}: {exception}",
 			)
+			frappe.log_error(
+				message=frappe.get_traceback(),
+				title=f"Shopify tracking failed for {doc.name}",
+			)
+			errors.append(f"{delivery_note}: {exception}")
 			continue
 		if outcome:
 			results.append(outcome)
 
-	return {"fulfilled": results}
+	# Hata, gönderiyi engellememeli ama kaybolmamalı da: çağıran görsün diye
+	# sonuçla birlikte dönüyor. Aksi hâlde reddedilmiş bir istek, "yapacak iş
+	# yoktu" ile aynı görünür.
+	return {"fulfilled": results, "errors": errors}
 
 
 def _fulfil_delivery_note(setting, shipment, delivery_note):
@@ -244,37 +256,55 @@ def _claim(available, wanted):
 
 
 def _post_fulfillment(setting, claimed, number, url, notify):
-	if not claimed:
-		return None
-	payload = {
-		"fulfillment": {
-			"line_items_by_fulfillment_order": [
-				{"fulfillment_order_id": fo_id, "fulfillment_order_line_items": items}
-				for fo_id, items in claimed.items()
-			],
-			"tracking_info": {"number": number, "url": url},
-			"notify_customer": bool(notify),
+	"""One fulfillment per fulfillment order. Returns the ids created.
+
+	Not one fulfillment spanning several. Splitting an order in Shopify — after
+	the shipment was built, which is normal — puts its lines into separate
+	fulfillment orders, and a fulfillment cannot cover more than one of them:
+	they can sit at different locations. A combined request is refused outright.
+
+	The same tracking number goes on each, which Shopify allows. The customer
+	sees one number against every line it actually covers.
+	"""
+	created = []
+	for fo_id, items in (claimed or {}).items():
+		if not items:
+			continue
+		payload = {
+			"fulfillment": {
+				"line_items_by_fulfillment_order": [
+					{"fulfillment_order_id": fo_id, "fulfillment_order_line_items": items}
+				],
+				"tracking_info": {"number": number, "url": url},
+				"notify_customer": bool(notify),
+			}
 		}
-	}
-	response = _post(setting, "fulfillments.json", payload)
-	return ((response or {}).get("fulfillment") or {}).get("id")
+		response = _post(setting, "fulfillments.json", payload)
+		fulfillment_id = ((response or {}).get("fulfillment") or {}).get("id")
+		if fulfillment_id:
+			created.append(fulfillment_id)
+	return created
 
 
 def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
-	"""One fulfillment per parcel, each carrying its own tracking number."""
+	"""A parcel's own tracking number on every fulfillment it covers.
+
+	A parcel can hold lines from two fulfillment orders, and each of those needs
+	its own fulfillment — so one parcel may produce more than one, all carrying
+	that parcel's number.
+	"""
 	notify = setting.get("notify_customer_on_tracking_push")
 	created = []
 	for index, (_parcel_no, wanted) in enumerate(parcels):
 		claimed = _claim(available, wanted)
 		if not claimed:
 			continue
-		fulfillment_id = _post_fulfillment(
+		for fulfillment_id in _post_fulfillment(
 			setting, claimed,
 			numbers[index] if index < len(numbers) else None,
 			urls[index] if index < len(urls) else None,
 			notify,
-		)
-		if fulfillment_id:
+		):
 			created.append(fulfillment_id)
 			_set_company(setting, fulfillment_id, shipment.get("carrier"))
 	return created
@@ -285,16 +315,15 @@ def _fulfil_whole(setting, shipment, available, numbers, urls):
 	for line in available:
 		wanted[line["item_code"]] = wanted.get(line["item_code"], 0) + line["qty"]
 
-	fulfillment_id = _post_fulfillment(
+	created = _post_fulfillment(
 		setting, _claim(available, wanted),
 		numbers[0] if numbers else None,
 		urls[0] if urls else None,
 		setting.get("notify_customer_on_tracking_push"),
 	)
-	if not fulfillment_id:
-		return []
-	_set_company(setting, fulfillment_id, shipment.get("carrier"))
-	return [fulfillment_id]
+	for fulfillment_id in created:
+		_set_company(setting, fulfillment_id, shipment.get("carrier"))
+	return created
 
 
 def _set_company(setting, fulfillment_id, carrier):
@@ -425,9 +454,12 @@ def push_unsent_tracking(days=SCAN_DAYS, limit=50, dry_run=True):
 
 		try:
 			outcome = push_tracking(row.name)
+			if outcome.get("errors"):
+				for message in outcome["errors"]:
+					results["failed"].append(f"{row.name}: {message}")
 			if outcome.get("fulfilled"):
 				results["pushed"].append(f"{row.name}: {len(outcome['fulfilled'])} fulfillment(s)")
-			else:
+			elif not outcome.get("errors"):
 				results["skipped"].append(f"{row.name}: {outcome.get('skipped') or 'nothing to send'}")
 		except Exception as exception:
 			results["failed"].append(f"{row.name}: {exception}")
