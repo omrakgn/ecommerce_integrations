@@ -479,7 +479,17 @@ def push_unsent_tracking(days=SCAN_DAYS, limit=50, dry_run=True):
 				for message in outcome["errors"]:
 					results["failed"].append(f"{row.name}: {message}")
 			if outcome.get("fulfilled"):
-				results["pushed"].append(f"{row.name}: {len(outcome['fulfilled'])} fulfillment(s)")
+				# `fulfilled` irsaliye başına bir kayıt taşıyor; fulfillment sayısı
+				# içindeki listede. Öncesi irsaliye sayısını "fulfillment" diye
+				# yazıyordu ve iki koliyle çıkan bir gönderi "1" görünüyordu.
+				count = 0
+				notes = []
+				for entry in outcome["fulfilled"]:
+					count += len(entry.get("fulfillments") or [])
+					notes.append(entry.get("delivery_note"))
+				results["pushed"].append(
+					f"{row.name}: {count} fulfillment(s) on {', '.join(str(n) for n in notes)}"
+				)
 			elif not outcome.get("errors"):
 				results["skipped"].append(f"{row.name}: {outcome.get('skipped') or 'nothing to send'}")
 		except Exception as exception:
