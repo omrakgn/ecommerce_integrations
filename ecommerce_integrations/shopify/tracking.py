@@ -59,6 +59,7 @@ def push_tracking(shipment):
 
 	results = []
 	errors = []
+	unsent = []
 	for delivery_note in seen:
 		try:
 			outcome = _fulfil_delivery_note(setting, doc, delivery_note)
@@ -79,11 +80,13 @@ def push_tracking(shipment):
 			continue
 		if outcome:
 			results.append(outcome)
+			for message in outcome.get("unsent") or []:
+				unsent.append(f"{delivery_note}: {message}")
 
-	# Hata, gönderiyi engellememeli ama kaybolmamalı da: çağıran görsün diye
-	# sonuçla birlikte dönüyor. Aksi hâlde reddedilmiş bir istek, "yapacak iş
-	# yoktu" ile aynı görünür.
-	return {"fulfilled": results, "errors": errors}
+	# Hata ve gitmeyen takip numarası, gönderiyi engellememeli ama kaybolmamalı
+	# da: çağıran görsün diye sonuçla birlikte dönüyor. Aksi hâlde reddedilmiş
+	# bir istek, "yapacak iş yoktu" ile aynı görünür.
+	return {"fulfilled": results, "errors": errors, "unsent": unsent}
 
 
 def _fulfil_delivery_note(setting, shipment, delivery_note):
@@ -116,11 +119,20 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 	per_parcel = len(parcels) > 1 and len(parcels) == len(numbers)
 
 	if per_parcel:
-		fulfillments = _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls)
+		fulfillments, unsent = _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls)
 	else:
-		fulfillments = _fulfil_whole(setting, shipment, available, numbers, urls)
+		fulfillments, unsent = _fulfil_whole(setting, shipment, available, parcels, numbers, urls)
 
 	if not fulfillments:
+		if unsent:
+			# Hiç fulfillment açılmadı ama sebebi biliniyor: söyle, yoksa bu da
+			# "yapacak iş yoktu" ile aynı görünür.
+			create_shopify_log(
+				status="Success",
+				method="ecommerce_integrations.shopify.tracking.push_tracking",
+				message=f"Shopify order {order_id}: nothing reported from {shipment.name} — "
+				+ "; ".join(unsent),
+			)
 		return None
 
 	frappe.db.set_value(
@@ -132,10 +144,10 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 		method="ecommerce_integrations.shopify.tracking.push_tracking",
 		message=(
 			f"Shopify order {order_id}: {len(fulfillments)} fulfillment(s) from {shipment.name}"
-			+ ("" if per_parcel else _unsent_note(numbers, parcels))
+			+ ((" — " + "; ".join(unsent)) if unsent else "")
 		),
 	)
-	return {"delivery_note": dn.name, "fulfillments": fulfillments}
+	return {"delivery_note": dn.name, "fulfillments": fulfillments, "unsent": unsent}
 
 
 def _unsent_note(numbers, parcels):
@@ -149,7 +161,7 @@ def _unsent_note(numbers, parcels):
 		else f"{len(parcels)} parcels but {len(numbers)} tracking numbers"
 	)
 	return (
-		f" — sent as one fulfillment because {reason}, so only {numbers[0]} reached Shopify;"
+		f"sent as one fulfillment because {reason}, so only {numbers[0]} reached Shopify;"
 		f" the others ({', '.join(numbers[1:])}) did not"
 	)
 
@@ -301,9 +313,20 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 	notify = setting.get("notify_customer_on_tracking_push")
 	carriers = _parcel_carriers(shipment)
 	created = []
+	unsent = []
 	for index, (parcel_no, wanted) in enumerate(parcels):
+		number = numbers[index] if index < len(numbers) else None
 		claimed = _claim(available, wanted)
 		if not claimed:
+			# Bu kolinin içeriği Shopify tarafında zaten karşılanmış: fulfillment
+			# açılmıyor ve numarası hiçbir yere gitmiyor. Sessiz kalırsa müşteri
+			# bir kutuyu takip edemez ve sebebi hiçbir kayıtta görünmez.
+			unsent.append(
+				_("parcel {0} ({1}): nothing left to report — {2}").format(
+					parcel_no, number or _("no number"),
+					", ".join(f"{code} x{qty:g}" for code, qty in wanted.items()),
+				)
+			)
 			continue
 		# Kolinin kendi taşıyıcısı. Gönderi başlığındaki `carrier`, koliler ayrı
 		# taşıyıcılarla gittiğinde "DPD, FEDEX" gibi birleşik bir metin oluyor;
@@ -311,13 +334,13 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 		carrier = carriers.get(parcel_no) or shipment.get("carrier")
 		for fulfillment_id in _post_fulfillment(
 			setting, claimed,
-			numbers[index] if index < len(numbers) else None,
+			number,
 			urls[index] if index < len(urls) else None,
 			notify,
 			carrier,
 		):
 			created.append(fulfillment_id)
-	return created
+	return created, unsent
 
 
 def _parcel_carriers(shipment):
@@ -336,7 +359,7 @@ def _parcel_carriers(shipment):
 	return carriers
 
 
-def _fulfil_whole(setting, shipment, available, numbers, urls):
+def _fulfil_whole(setting, shipment, available, parcels, numbers, urls):
 	wanted = {}
 	for line in available:
 		wanted[line["item_code"]] = wanted.get(line["item_code"], 0) + line["qty"]
@@ -345,13 +368,15 @@ def _fulfil_whole(setting, shipment, available, numbers, urls):
 	# Tek fulfillment açılıyorsa taşıyıcı da tek olmalı; koliler ayrı taşıyıcılarla
 	# gittiyse başlıktaki birleşik metin yerine ilk kolinin taşıyıcısı yazılıyor.
 	carrier = carriers.get(1) or shipment.get("carrier")
-	return _post_fulfillment(
+	created = _post_fulfillment(
 		setting, _claim(available, wanted),
 		numbers[0] if numbers else None,
 		urls[0] if urls else None,
 		setting.get("notify_customer_on_tracking_push"),
 		carrier,
 	)
+	note = _unsent_note(numbers, parcels)
+	return created, ([note] if note else [])
 
 
 @frappe.whitelist()
@@ -488,7 +513,7 @@ def push_unsent_tracking(days=SCAN_DAYS, limit=50, dry_run=True):
 		return {"skipped": "disabled"}
 
 	cutoff = add_days(nowdate(), -days)
-	results = {"pushed": [], "skipped": [], "failed": [], "dry_run": bool(dry_run)}
+	results = {"pushed": [], "unsent": [], "skipped": [], "failed": [], "dry_run": bool(dry_run)}
 
 	shipments = frappe.get_all(
 		"Shipment",
@@ -525,6 +550,8 @@ def push_unsent_tracking(days=SCAN_DAYS, limit=50, dry_run=True):
 
 		try:
 			outcome = push_tracking(row.name)
+			for message in outcome.get("unsent") or []:
+				results["unsent"].append(f"{row.name}: {message}")
 			if outcome.get("errors"):
 				for message in outcome["errors"]:
 					results["failed"].append(f"{row.name}: {message}")
