@@ -16,7 +16,7 @@ import json
 import frappe
 import requests
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import add_days, flt, nowdate
 
 from ecommerce_integrations.shopify.constants import (
 	API_VERSION,
@@ -341,3 +341,97 @@ def _post(setting, path, payload):
 	if not response.ok:
 		frappe.throw(_("Shopify {0}: {1}").format(response.status_code, response.text[:300]))
 	return response.json()
+
+
+# ---------------------------------------------------------------------------
+# Onay anı yetmiyor — takip numarası sonradan yazılıyor
+# ---------------------------------------------------------------------------
+#
+# `on_submit` doğru an değil. Etiket, gönderi **onaylandıktan sonra** alınıyor ve
+# `awb_number` erpnext_shipping tarafından `db_set` ile yazılıyor — `db_set`
+# hiçbir doküman olayı tetiklemez. Yani kanca, numara henüz boşken çalışıp
+# "takip numarası yok" diyerek çıkıyor, numara yazılırken de hiçbir şey olmuyor.
+#
+# Bu yüzden asıl tetikleyici bir tarama. Kanca yine duruyor: numarası onay
+# anında hazır olan bir gönderi varsa Shopify'ı hemen öğrensin.
+
+# Taramanın geriye bakma penceresi. Küçük tutuluyor: geçmişe dönük bir süpürme,
+# aylar önce kapanmış siparişler için müşteriye "kargoya verildi" e-postası
+# gönderir.
+SCAN_DAYS = 7
+
+
+@frappe.whitelist()
+def push_unsent_tracking(days=SCAN_DAYS, limit=50, dry_run=True):
+	"""Report shipments whose tracking never reached Shopify.
+
+	Bounded by age on purpose. A sweep over history would fulfil orders that were
+	closed months ago, and Shopify emails the customer when an order is
+	fulfilled — the loudest possible way to be wrong.
+
+	Defaults to a dry run: it tells Shopify things, and something that tells a
+	customer something should have to be asked twice.
+	"""
+	dry_run = frappe.parse_json(dry_run) if isinstance(dry_run, str) else dry_run
+	days = int(days)
+	limit = int(limit)
+
+	setting = frappe.get_cached_doc(SETTING_DOCTYPE)
+	if not setting.is_enabled() or not setting.get("push_tracking_to_shopify"):
+		return {"skipped": "disabled"}
+
+	cutoff = add_days(nowdate(), -days)
+	results = {"pushed": [], "skipped": [], "failed": [], "dry_run": bool(dry_run)}
+
+	shipments = frappe.get_all(
+		"Shipment",
+		filters={"docstatus": 1, "awb_number": ["is", "set"], "creation": [">=", cutoff]},
+		fields=["name"],
+		order_by="creation desc",
+		limit=limit,
+	)
+
+	for row in shipments:
+		notes = frappe.get_all(
+			"Shipment Delivery Note", filters={"parent": row.name}, pluck="delivery_note"
+		)
+		wanted = []
+		for delivery_note in notes:
+			if not delivery_note:
+				continue
+			state = frappe.db.get_value(
+				"Delivery Note", delivery_note, [ORDER_ID_FIELD, FULLFILLMENT_ID_FIELD], as_dict=True
+			)
+			if not state or not state.get(ORDER_ID_FIELD):
+				continue  # Shopify siparişi değil
+			if state.get(FULLFILLMENT_ID_FIELD):
+				continue  # zaten bildirilmiş
+			wanted.append(delivery_note)
+
+		if not wanted:
+			continue
+
+		if dry_run:
+			results["pushed"].append(f"{row.name}: {', '.join(wanted)}")
+			continue
+
+		try:
+			outcome = push_tracking(row.name)
+			if outcome.get("fulfilled"):
+				results["pushed"].append(f"{row.name}: {len(outcome['fulfilled'])} fulfillment(s)")
+			else:
+				results["skipped"].append(f"{row.name}: {outcome.get('skipped') or 'nothing to send'}")
+		except Exception as exception:
+			results["failed"].append(f"{row.name}: {exception}")
+
+	return results
+
+
+def scan_unsent_tracking():
+	"""Scheduler: send the tracking that the submit hook could not."""
+	results = push_unsent_tracking(dry_run=False)
+	if results.get("failed"):
+		frappe.log_error(
+			message="\n".join(results["failed"]),
+			title="Shopify tracking could not be pushed",
+		)

@@ -145,6 +145,9 @@ scheduler_events = {
 	],
 	"daily_long": ["ecommerce_integrations.zenoti.doctype.zenoti_settings.zenoti_settings.sync_stocks"],
 	"hourly": [
+		# `on_submit` yetmiyor: etiket onaydan sonra alınıyor ve `awb_number`
+		# `db_set` ile yazılıyor — o hiçbir olay tetiklemez. Bkz. tracking.py
+		"ecommerce_integrations.shopify.tracking.scan_unsent_tracking",
 		"ecommerce_integrations.shopify.order.sync_old_orders",
 		"ecommerce_integrations.amazon.doctype.amazon_sp_api_settings.amazon_sp_api_settings.schedule_get_order_details",
 	],
