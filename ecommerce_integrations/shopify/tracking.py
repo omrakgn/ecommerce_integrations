@@ -109,6 +109,56 @@ def push_tracking(shipment):
 	return {"fulfilled": results, "errors": errors, "unsent": unsent}
 
 
+@frappe.whitelist()
+def retrack_shipment(shipment):
+	"""Put this shipment's tracking on the fulfillments Shopify already holds.
+
+	For a parcel that replaces one already reported: the first attempt came back
+	— address not found, nobody home — and the goods left again under a new
+	number. Shopify counts those lines as fulfilled, so a new fulfillment is
+	refused; the number on the fulfillment that exists has to be rewritten.
+
+	Deliberate rather than automatic, and that is the point. "Nothing left to
+	fulfil" alone cannot tell a replacement parcel from an extra one: an order
+	SendCloud already fulfilled looks exactly the same, and rewriting there would
+	take away the tracking of a parcel the customer is still waiting for. Only
+	the person sending the replacement knows which it is.
+
+	The label hook covers the narrower case on its own — a fulfillment we created
+	ourselves, whose id we hold. Everything Shopify learned from SendCloud needs
+	this call.
+
+	See docs/plans/basarisiz-teslimat.md.
+	"""
+	setting = frappe.get_cached_doc(SETTING_DOCTYPE)
+	if not setting.is_enabled() or not setting.get("push_tracking_to_shopify"):
+		return {"skipped": "disabled"}
+
+	doc = frappe.get_doc("Shipment", shipment)
+	if not doc.get("awb_number"):
+		return {"skipped": "no tracking number"}
+
+	seen = []
+	for row in doc.get("shipment_delivery_note") or []:
+		if row.delivery_note and row.delivery_note not in seen:
+			seen.append(row.delivery_note)
+
+	results = []
+	for delivery_note in seen:
+		dn = frappe.db.get_value(
+			"Delivery Note", delivery_note,
+			["name", "is_return", ORDER_ID_FIELD, FULLFILLMENT_ID_FIELD],
+			as_dict=True,
+		)
+		if not dn or not dn.get(ORDER_ID_FIELD) or dn.get("is_return"):
+			continue
+		outcome = _retrack_delivery_note(setting, doc, dn, dn.get(ORDER_ID_FIELD))
+		if outcome:
+			results.append(outcome)
+
+	return {"retracked": results}
+
+
 def _fulfil_delivery_note(setting, shipment, delivery_note):
 	dn = frappe.db.get_value(
 		"Delivery Note", delivery_note,
@@ -217,14 +267,33 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 	Not a return: the sale stands and no credit note follows. See
 	docs/plans/basarisiz-teslimat.md for the whole flow.
 	"""
-	stored = [f.strip() for f in str(dn.get(FULLFILLMENT_ID_FIELD) or "").split(",") if f.strip()]
-	if not stored:
-		return None
-
 	numbers = [t.strip() for t in (shipment.awb_number or "").split(",") if t.strip()]
 	urls = [u.strip() for u in (shipment.tracking_url or "").split(",") if u.strip()]
 	carriers = _parcel_carriers(shipment)
 	notify = setting.get("notify_customer_on_tracking_push")
+
+	# Shopify'da gerçekten duran fulfillment'lar. Yazmadan önce okunuyor: numara
+	# zaten aynıysa hiçbir çağrı yapılmıyor, çünkü etiket kancası birden fazla kez
+	# tetiklenebiliyor ve her tetiklenmede müşteriye yeni bir kargo e-postası
+	# gitmesi kabul edilemez.
+	current = _fulfillment_tracking(setting, order_id)
+
+	stored = [f.strip() for f in str(dn.get(FULLFILLMENT_ID_FIELD) or "").split(",") if f.strip()]
+	if not stored:
+		# Fulfillment'ı biz açmamışız. Olağan durum bu: normal yolda Shopify'ı
+		# SendCloud haberdar ediyor, ERPNext yalnız kendi bastığı etiketleri
+		# bildiriyor. Kendi alanımıza bakıp "kayıt yok" demek, Shopify'da gözle
+		# görülen fulfillment'ı yok saymak olurdu — ve yeniden gönderilen paketin
+		# numarası yine hiçbir yere gitmezdi.
+		stored = list(current.keys())
+
+	# Shopify'ın listesinde olmayan id: iptal edilmiş ya da artık yok. Üstüne
+	# yazmaya çalışmak hata verir.
+	unknown = [f for f in stored if str(f) not in current]
+	stored = [f for f in stored if str(f) in current]
+
+	if not stored:
+		return None
 
 	# Sıraya güvenmek ancak saklanan id'ler ile bu gönderinin numaraları birebir
 	# karşılık geliyorsa doğru. İrsaliye birden çok gönderiyle çıktıysa id'ler
@@ -244,12 +313,12 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 		)
 		return {"delivery_note": dn.name, "retracked": [], "unsent": [reason]}
 
-	# Shopify'daki mevcut numaralar. Karşılaştırmadan yazmak, kancanın iki kez
-	# tetiklendiği her seferde müşteriye yeni bir kargo e-postası gönderirdi.
-	current = _fulfillment_tracking(setting, order_id)
-
 	retracked = []
 	unsent = []
+	if unknown:
+		unsent.append(
+			_("not on Shopify any more, left alone: {0}").format(", ".join(str(f) for f in unknown))
+		)
 	for index, fulfillment_id in enumerate(stored):
 		number = numbers[index] if index < len(numbers) else None
 		if not number:
@@ -300,8 +369,10 @@ def _fulfillment_tracking(setting, order_id):
 	data = _get(setting, f"orders/{order_id}/fulfillments.json")
 	tracking = {}
 	for row in (data or {}).get("fulfillments") or []:
-		if row.get("id") is not None:
-			tracking[str(row["id"])] = row.get("tracking_number")
+		# İptal edilmiş fulfillment güncellenemez ve müşteriye de görünmez.
+		if row.get("id") is None or row.get("status") != "success":
+			continue
+		tracking[str(row["id"])] = row.get("tracking_number")
 	return tracking
 
 
