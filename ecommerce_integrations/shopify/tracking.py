@@ -265,58 +265,68 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 	fulfillment is refused; the only way to reach the customer is to replace the
 	tracking on the fulfillment that is already there.
 
+	Nothing is paired by position. Three orderings meet here and no two of them
+	agree: Shopify lists fulfillments in its own order, the carrier numbers the
+	parcels in another, and our parcel table is read in a third. An early version
+	lined them up by index and crossed a pillow's tracking with a mattress's — the
+	customer clicked their mattress and watched a pillow travel.
+
+	So both sides are matched by what they contain. Each parcel is tied to its
+	tracking number through the carrier's own per-parcel record, and to a
+	fulfillment through the items that fulfillment covers.
+
+	When any parcel cannot be matched, nothing is written at all and the reason is
+	logged. A partly-correct pairing cannot be used without knowing which part is
+	correct.
+
 	Not a return: the sale stands and no credit note follows. See
 	docs/plans/basarisiz-teslimat.md for the whole flow.
 	"""
 	numbers = [t.strip() for t in (shipment.awb_number or "").split(",") if t.strip()]
 	urls = [u.strip() for u in (shipment.tracking_url or "").split(",") if u.strip()]
-	carriers = _parcel_carriers(shipment)
 	notify = setting.get("notify_customer_on_tracking_push")
 
-	# Saklanan fulfillment id'leri koli sırasında oluşturuldu, `awb_number` ise
-	# taşıyıcının sırasında yazıldı. İkisi aynı sıra değil. Eşleme kurulabiliyorsa
-	# numaralar koli sırasına diziliyor; kurulamıyorsa aşağıdaki sayı kontrolü
-	# devreye giriyor ve hiçbir şey yazılmıyor.
-	pairing = _pair_parcels_with_tracking(shipment, _parcel_contents(shipment))
-	if pairing:
-		numbers = [row[2] for row in pairing]
-		urls = [row[3] or "" for row in pairing]
-		carriers = {index: row[4] for index, row in enumerate(pairing, start=1) if row[4]}
-
-	# Shopify'da gerçekten duran fulfillment'lar. Yazmadan önce okunuyor: numara
-	# zaten aynıysa hiçbir çağrı yapılmıyor, çünkü etiket kancası birden fazla kez
-	# tetiklenebiliyor ve her tetiklenmede müşteriye yeni bir kargo e-postası
-	# gitmesi kabul edilemez.
+	# Shopify'da gerçekten duran fulfillment'lar, kalemleriyle birlikte. Yazmadan
+	# önce okunuyor: numara zaten aynıysa hiçbir çağrı yapılmıyor, çünkü etiket
+	# kancası birden fazla kez tetiklenebiliyor ve her tetiklenmede müşteriye yeni
+	# bir kargo e-postası gitmesi kabul edilemez.
 	current = _fulfillment_tracking(setting, order_id)
-
-	stored = [f.strip() for f in str(dn.get(FULLFILLMENT_ID_FIELD) or "").split(",") if f.strip()]
-	if not stored:
-		# Fulfillment'ı biz açmamışız. Olağan durum bu: normal yolda Shopify'ı
-		# SendCloud haberdar ediyor, ERPNext yalnız kendi bastığı etiketleri
-		# bildiriyor. Kendi alanımıza bakıp "kayıt yok" demek, Shopify'da gözle
-		# görülen fulfillment'ı yok saymak olurdu — ve yeniden gönderilen paketin
-		# numarası yine hiçbir yere gitmezdi.
-		stored = list(current.keys())
-
-	# Shopify'ın listesinde olmayan id: iptal edilmiş ya da artık yok. Üstüne
-	# yazmaya çalışmak hata verir.
-	unknown = [f for f in stored if str(f) not in current]
-	stored = [f for f in stored if str(f) in current]
-
-	if not stored:
+	if not current:
 		return None
 
-	# Sıraya güvenmek ancak saklanan id'ler ile bu gönderinin numaraları birebir
-	# karşılık geliyorsa doğru. İrsaliye birden çok gönderiyle çıktıysa id'ler
-	# birden çok gönderiye ait oluyor ve indeksle eşlemek, bir kolinin numarasını
-	# başka bir kolinin fulfillment'ına yazmak demek — müşteri o kutuyu tümden
-	# kaybeder. Sayılar tutmuyorsa tahmin etmek yerine duruyoruz.
-	if len(stored) != len(numbers):
+	parcels = _parcel_contents(shipment)
+	pairing = _pair_parcels_with_tracking(shipment, parcels) if len(parcels) > 1 else None
+
+	plan = []
+	reason = None
+
+	if pairing:
+		kalan = dict(current)
+		for _parcel_no, wanted, number, url, carrier in pairing:
+			aranan = frozenset(wanted.keys())
+			bulunan = next((fid for fid, info in kalan.items() if info["items"] == aranan), None)
+			if not bulunan:
+				reason = (
+					"no fulfillment on Shopify covers exactly "
+					+ ", ".join(sorted(aranan))
+					+ " — nothing rewritten"
+				)
+				plan = []
+				break
+			kalan.pop(bulunan)
+			plan.append((bulunan, number, url, carrier or shipment.get("carrier")))
+	elif len(current) == 1 and len(numbers) == 1:
+		# Tek kutu, tek fulfillment: eşleştirilecek bir belirsizlik yok.
+		plan.append((next(iter(current)), numbers[0], urls[0] if urls else None,
+		             shipment.get("carrier")))
+	else:
 		reason = (
-			f"{len(stored)} fulfillment on the delivery note but {len(numbers)} "
-			f"tracking number(s) on {shipment.name} — cannot tell which belongs to which, "
-			"nothing rewritten"
+			f"{len(current)} fulfillment(s) on Shopify and {len(numbers)} tracking "
+			f"number(s) on {shipment.name}, and the parcels could not be matched to "
+			"either — nothing rewritten"
 		)
+
+	if reason:
 		create_shopify_log(
 			status="Success",
 			method="ecommerce_integrations.shopify.tracking.push_tracking",
@@ -326,12 +336,7 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 
 	retracked = []
 	unsent = []
-	if unknown:
-		unsent.append(
-			_("not on Shopify any more, left alone: {0}").format(", ".join(str(f) for f in unknown))
-		)
-	for index, fulfillment_id in enumerate(stored):
-		number = numbers[index] if index < len(numbers) else None
+	for fulfillment_id, number, url, carrier in plan:
 		if not number:
 			# Numarasız güncelleme, duran numarayı **siler**: bu uç nokta
 			# `tracking_info`'yu değiştiriyor, birleştirmiyor. Yazmaktansa
@@ -342,17 +347,10 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 				)
 			)
 			continue
-		if current.get(str(fulfillment_id)) == number:
+		if (current.get(fulfillment_id) or {}).get("number") == number:
 			continue  # aynı numara zaten duruyor
 
-		_update_tracking(
-			setting,
-			fulfillment_id,
-			number,
-			urls[index] if index < len(urls) else None,
-			carriers.get(index + 1) or shipment.get("carrier"),
-			notify,
-		)
+		_update_tracking(setting, fulfillment_id, number, url, carrier, notify)
 		retracked.append(fulfillment_id)
 
 	if retracked:
@@ -383,7 +381,18 @@ def _fulfillment_tracking(setting, order_id):
 		# İptal edilmiş fulfillment güncellenemez ve müşteriye de görünmez.
 		if row.get("id") is None or row.get("status") != "success":
 			continue
-		tracking[str(row["id"])] = row.get("tracking_number")
+		# Kalemleri de alınıyor: hangi fulfillment'ın hangi koliye ait olduğu
+		# ancak içeriğinden bilinebiliyor. Shopify'ın listeleme sırası ile bizim
+		# koli sıramız arasında hiçbir bağ yok.
+		items = set()
+		for line in row.get("line_items") or []:
+			code = _resolve_item_code(line)
+			if code:
+				items.add(code)
+		tracking[str(row["id"])] = {
+			"number": row.get("tracking_number"),
+			"items": frozenset(items),
+		}
 	return tracking
 
 
