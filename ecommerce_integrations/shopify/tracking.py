@@ -112,11 +112,20 @@ def push_tracking(shipment):
 def _fulfil_delivery_note(setting, shipment, delivery_note):
 	dn = frappe.db.get_value(
 		"Delivery Note", delivery_note,
-		["name", ORDER_ID_FIELD, FULLFILLMENT_ID_FIELD],
+		["name", "is_return", ORDER_ID_FIELD, FULLFILLMENT_ID_FIELD],
 		as_dict=True,
 	)
 	if not dn or not dn.get(ORDER_ID_FIELD):
 		return None  # Shopify siparişi değil
+
+	# İade irsaliyesi Shopify sipariş numarasını **taşıyor**: `make_sales_return`
+	# alanları aslından kopyalıyor. Ona bağlı bir gönderi (müşteriden bize gelen
+	# paket) buraya düşerse, iade etiketinin numarası müşterinin gidiş
+	# fulfillment'ının üstüne yazılır — müşteri kendi kargosunu tümden kaybeder.
+	# Bugün iade kargosu irsaliye bağlamıyor, ama bu bir tesadüf; kural burada
+	# duruyor ki bağlandığı gün sessizce bozulmasın.
+	if dn.get("is_return"):
+		return None
 
 	order_id = dn.get(ORDER_ID_FIELD)
 
