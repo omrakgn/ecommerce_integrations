@@ -209,14 +209,15 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 	urls = [u.strip() for u in (shipment.tracking_url or "").split(",") if u.strip()]
 	parcels = _parcel_contents(shipment)
 
-	# Parça bazında bildirmek ancak hangi kutunun hangi numarayı taşıdığı bilinirse
-	# doğru olur. Koli-ürün tablosu boşsa ya da koli sayısı takip numarası sayısıyla
-	# tutmuyorsa bu bilinmiyor demektir — o hâlde tahmin etmek yerine tek
-	# fulfillment açılıp neyin eksik kaldığı yazılır.
-	per_parcel = len(parcels) > 1 and len(parcels) == len(numbers)
+	# Parça bazında bildirmek, hangi kutunun hangi numarayı taşıdığı **söylenmişse**
+	# doğru. Sayıların tutması yetmiyor: iki liste eşit uzunlukta olup ayrı
+	# sıralarda olabiliyor ve o zaman her kutu komşusunun numarasını alıyor.
+	# Eşleme kurulamıyorsa tek fulfillment açılıp neyin eksik kaldığı yazılıyor —
+	# az bildirmek, müşteriyi yanlış kutuya yönlendirmekten iyidir.
+	pairing = _pair_parcels_with_tracking(shipment, parcels) if len(parcels) > 1 else None
 
-	if per_parcel:
-		fulfillments, unsent = _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls)
+	if pairing:
+		fulfillments, unsent = _fulfil_per_parcel(setting, shipment, available, pairing)
 	else:
 		fulfillments, unsent = _fulfil_whole(setting, shipment, available, parcels, numbers, urls)
 
@@ -271,6 +272,16 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 	urls = [u.strip() for u in (shipment.tracking_url or "").split(",") if u.strip()]
 	carriers = _parcel_carriers(shipment)
 	notify = setting.get("notify_customer_on_tracking_push")
+
+	# Saklanan fulfillment id'leri koli sırasında oluşturuldu, `awb_number` ise
+	# taşıyıcının sırasında yazıldı. İkisi aynı sıra değil. Eşleme kurulabiliyorsa
+	# numaralar koli sırasına diziliyor; kurulamıyorsa aşağıdaki sayı kontrolü
+	# devreye giriyor ve hiçbir şey yazılmıyor.
+	pairing = _pair_parcels_with_tracking(shipment, _parcel_contents(shipment))
+	if pairing:
+		numbers = [row[2] for row in pairing]
+		urls = [row[3] or "" for row in pairing]
+		carriers = {index: row[4] for index, row in enumerate(pairing, start=1) if row[4]}
 
 	# Shopify'da gerçekten duran fulfillment'lar. Yazmadan önce okunuyor: numara
 	# zaten aynıysa hiçbir çağrı yapılmıyor, çünkü etiket kancası birden fazla kez
@@ -384,7 +395,8 @@ def _unsent_note(numbers, parcels):
 	reason = (
 		"parcel items are not filled in"
 		if not parcels
-		else f"{len(parcels)} parcels but {len(numbers)} tracking numbers"
+		else "the carrier's parcel list could not be matched to the parcel contents, "
+		f"so none of the {len(numbers)} numbers could be tied to a box with certainty"
 	)
 	return (
 		f"sent as one fulfillment because {reason}, so only {numbers[0]} reached Shopify;"
@@ -529,7 +541,76 @@ def _post_fulfillment(setting, claimed, number, url, notify, carrier=None):
 	return created
 
 
-def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
+def _pair_parcels_with_tracking(shipment, parcels):
+	"""[(parcel_no, wanted, number, url, carrier)] or None.
+
+	Pairs each parcel with the tracking number that parcel actually carries.
+
+	Not by position. `awb_number` is a comma-joined string built in the carrier's
+	parcel order, and `custom_parcel_items` is read in `parcel_no` order — the two
+	orders are unrelated. A shipment of one pillow box and one mattress box went
+	out with the mattress first at the carrier and the pillow first in our table,
+	so index pairing put the mattress's number on the pillow and the pillow's on
+	the mattress. The customer clicked their mattress and watched a pillow.
+
+	`custom_tracking_details` is written parcel by parcel from the carrier's own
+	response and holds the tracking number together with the SKUs that parcel
+	contained. That pairing is the only one that is actually stated rather than
+	assumed.
+
+	Returns None when the pairing cannot be made with certainty. The caller then
+	falls back to a single fulfillment, which reports less but never points a
+	customer at the wrong box.
+	"""
+	raw = shipment.get("custom_tracking_details")
+	if not raw:
+		return None
+
+	try:
+		details = json.loads(raw)
+	except (ValueError, TypeError):
+		return None
+	if not isinstance(details, list) or not details:
+		return None
+
+	# SKU listesi virgülle birleştirilmiş metin olarak duruyor ve kaynağında 50
+	# karaktere kırpılıyor; uzun bir ürün kodu eşleşmez, o zaman eşleme kurulamaz
+	# ve tek fulfillment'a düşülür — yanlış eşleştirmektense az bildirmek.
+	kalan = []
+	for row in details:
+		if not isinstance(row, dict):
+			return None
+		number = (row.get("tracking_number") or "").strip()
+		if not number:
+			return None
+		skus = frozenset(s.strip() for s in (row.get("sku") or "").split(",") if s.strip())
+		if not skus:
+			return None
+		kalan.append({
+			"skus": skus,
+			"number": number,
+			"url": (row.get("tracking_url") or "").strip() or None,
+			"carrier": (row.get("carrier") or "").strip() or None,
+		})
+
+	eslesme = []
+	for parcel_no, wanted in parcels:
+		aranan = frozenset(wanted.keys())
+		bulunan = None
+		for index, aday in enumerate(kalan):
+			if aday["skus"] == aranan:
+				bulunan = kalan.pop(index)
+				break
+		if not bulunan:
+			# Bir koli eşleşmediyse hepsinden vazgeçiliyor. Kısmen doğru bir
+			# eşleme, hangi satırın doğru olduğunu bilmeden kullanılamaz.
+			return None
+		eslesme.append((parcel_no, wanted, bulunan["number"], bulunan["url"], bulunan["carrier"]))
+
+	return eslesme
+
+
+def _fulfil_per_parcel(setting, shipment, available, pairing):
 	"""A parcel's own tracking number on every fulfillment it covers.
 
 	A parcel can hold lines from two fulfillment orders, and each of those needs
@@ -537,11 +618,9 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 	that parcel's number.
 	"""
 	notify = setting.get("notify_customer_on_tracking_push")
-	carriers = _parcel_carriers(shipment)
 	created = []
 	unsent = []
-	for index, (parcel_no, wanted) in enumerate(parcels):
-		number = numbers[index] if index < len(numbers) else None
+	for parcel_no, wanted, number, url, carrier in pairing:
 		claimed = _claim(available, wanted)
 		if not claimed:
 			# Bu kolinin içeriği Shopify tarafında zaten karşılanmış: fulfillment
@@ -554,16 +633,16 @@ def _fulfil_per_parcel(setting, shipment, available, parcels, numbers, urls):
 				)
 			)
 			continue
-		# Kolinin kendi taşıyıcısı. Gönderi başlığındaki `carrier`, koliler ayrı
-		# taşıyıcılarla gittiğinde "DPD, FEDEX" gibi birleşik bir metin oluyor;
-		# onu Shopify'a yazmak takip bağlantısını çalışmaz hâle getirir.
-		carrier = carriers.get(parcel_no) or shipment.get("carrier")
+		# Taşıyıcı adı da kolinin kendisinden geliyor. Gönderi başlığındaki
+		# `carrier`, koliler ayrı taşıyıcılarla gittiğinde "DPD, FEDEX" gibi
+		# birleşik bir metin oluyor ve onu Shopify'a yazmak takip bağlantısını
+		# çalışmaz hâle getirir.
 		for fulfillment_id in _post_fulfillment(
 			setting, claimed,
 			number,
-			urls[index] if index < len(urls) else None,
+			url,
 			notify,
-			carrier,
+			carrier or shipment.get("carrier"),
 		):
 			created.append(fulfillment_id)
 	return created, unsent
@@ -625,6 +704,15 @@ def repair_tracking(shipment, notify=0):
 	numbers = [t.strip() for t in (doc.awb_number or "").split(",") if t.strip()]
 	urls = [u.strip() for u in (doc.tracking_url or "").split(",") if u.strip()]
 	carriers = _parcel_carriers(doc)
+
+	# Fulfillment id'leri koli sırasında saklandı, `awb_number` taşıyıcının
+	# sırasında yazıldı — ikisi aynı sıra değil. Bu araç sırayı düzeltmeden
+	# yazsaydı, onarmaya çalıştığı belgeye kutuların numaralarını çapraz koyardı.
+	pairing = _pair_parcels_with_tracking(doc, _parcel_contents(doc))
+	if pairing:
+		numbers = [row[2] for row in pairing]
+		urls = [row[3] or "" for row in pairing]
+		carriers = {index: row[4] for index, row in enumerate(pairing, start=1) if row[4]}
 
 	repaired = []
 	skipped = []
