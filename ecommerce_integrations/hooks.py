@@ -33,6 +33,10 @@ app_license = "GNU GPL v3.0"
 # include js in doctype views
 doctype_js = {
 	"Shopify Settings": "public/js/shopify/old_settings.js",
+	# Yeniden gönderimde Shopify'daki takip numarasını güncelleyen düğme. Bilerek
+	# düğme: otomatik yol, yerine geçen koli ile ek koliyi ayırt edemiyor.
+	# Bkz. docs/plans/basarisiz-teslimat.md §7.1
+	"Shipment": "public/js/shopify/shipment.js",
 	"Sales Order": [
 		"public/js/unicommerce/sales_order.js",
 		"public/js/common/ecommerce_transactions.js",
