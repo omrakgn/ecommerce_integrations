@@ -68,9 +68,10 @@ def push_tracking(shipment):
 		return {"skipped": "no tracking number"}
 
 	# Aynı irsaliye tabloda birden fazla satırda görünüyor — koli başına bir satır.
-	# Her satır için ayrı çağrı yapmak gereksiz: ilk çağrı fulfillment id'yi yazar,
-	# ikincisi onu görüp çıkar. Yine de tekilleştiriliyor, çünkü "iki kez denendi"
-	# ile "iki kez bildirildi" arasındaki farkı logdan okumak zor.
+	# Tekilleştirilmezse aynı irsaliye için koli sayısı kadar çağrı yapılır; ikinci
+	# çağrı Shopify'a gidip "gönderilecek bir şey kalmamış" cevabını alır. Yanlış
+	# sonuç doğurmaz ama boşuna istek atar ve logda "iki kez denendi" ile "iki kez
+	# bildirildi" birbirine karışır.
 	seen = []
 	for row in doc.get("shipment_delivery_note") or []:
 		if row.delivery_note and row.delivery_note not in seen:
@@ -117,14 +118,32 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 	if not dn or not dn.get(ORDER_ID_FIELD):
 		return None  # Shopify siparişi değil
 
-	# Zaten bildirilmişse tekrar etme. İkinci bir fulfillment, müşteriye ikinci bir
-	# "kargoya verildi" e-postası demek.
-	if dn.get(FULLFILLMENT_ID_FIELD):
-		return None
-
 	order_id = dn.get(ORDER_ID_FIELD)
+
+	# Ölçüt Shopify'ın kendi durumu: hâlâ gönderilebilir satır var mı?
+	#
+	# Önceden irsaliyedeki fulfillment id'sine bakılıp, doluysa çıkılıyordu.
+	# Amaç müşteriye ikinci bir "kargoya verildi" e-postası göndermemekti ama
+	# tek bir kontrol iki ayrı durumu birden eliyordu:
+	#
+	#   gönderilebilir satır VAR → bölünmüş gönderinin ikinci kolisi. Bir irsaliye
+	#       kutuya sığmadığında bilerek birkaç gönderiye bölünüyor; ikincisinin
+	#       takip numarası Shopify'a **hiç** gitmiyordu.
+	#   gönderilebilir satır YOK → bu koli daha önce bildirilmiş bir kolinin
+	#       yerine geçiyor: teslimat başarısız olmuş, paket dönmüş, yeni numarayla
+	#       yeniden gönderilmiş. Yeni fulfillment açılamaz (Shopify o satırları
+	#       karşılanmış sayıyor), duran fulfillment'ın takip bilgisi yeniden
+	#       yazılıyor. Bkz. docs/plans/basarisiz-teslimat.md
+	#
+	# Mükerrer bildirim korumasını Shopify'ın kendisi veriyor: bir kez fulfillment
+	# açıldıktan sonra o satırlar gönderilebilir listesinden düşüyor, dolayısıyla
+	# kanca ikinci kez tetiklenirse alttaki dal boş kalıyor. Kendi alanımıza
+	# bakmak, gerçeği kendi kaydımızdan okumaktı — bu projede kataloglanmış bir
+	# hata ailesi (bkz. docs/sessiz-varsayilan-tuzaklari.md).
 	available = _fulfillable_lines(setting, order_id)
 	if not available:
+		if dn.get(FULLFILLMENT_ID_FIELD):
+			return _retrack_delivery_note(setting, shipment, dn, order_id)
 		return None  # Shopify tarafında gönderilecek bir şey kalmamış
 
 	numbers = [t.strip() for t in (shipment.awb_number or "").split(",") if t.strip()]
@@ -154,9 +173,17 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 			)
 		return None
 
+	# Üstüne yazmak yerine ekleniyor. Bir irsaliye birden çok gönderiyle
+	# çıkabiliyor; ilk gönderinin fulfillment id'si silinirse onu ne
+	# `repair_tracking` ne de yeniden gönderim bir daha bulabiliyor.
+	stored = [f.strip() for f in str(dn.get(FULLFILLMENT_ID_FIELD) or "").split(",") if f.strip()]
+	for fulfillment_id in fulfillments:
+		if str(fulfillment_id) not in stored:
+			stored.append(str(fulfillment_id))
+
 	frappe.db.set_value(
 		"Delivery Note", dn.name, FULLFILLMENT_ID_FIELD,
-		", ".join(str(f) for f in fulfillments), update_modified=False,
+		", ".join(stored), update_modified=False,
 	)
 	create_shopify_log(
 		status="Success",
@@ -167,6 +194,106 @@ def _fulfil_delivery_note(setting, shipment, delivery_note):
 		),
 	)
 	return {"delivery_note": dn.name, "fulfillments": fulfillments, "unsent": unsent}
+
+
+def _retrack_delivery_note(setting, shipment, dn, order_id):
+	"""Rewrite the tracking on fulfillments that already exist.
+
+	Used when a parcel goes out a second time for the same lines: the first
+	attempt came back — address not found, nobody home — and the goods left again
+	under a new number. Shopify counts those lines as fulfilled, so a new
+	fulfillment is refused; the only way to reach the customer is to replace the
+	tracking on the fulfillment that is already there.
+
+	Not a return: the sale stands and no credit note follows. See
+	docs/plans/basarisiz-teslimat.md for the whole flow.
+	"""
+	stored = [f.strip() for f in str(dn.get(FULLFILLMENT_ID_FIELD) or "").split(",") if f.strip()]
+	if not stored:
+		return None
+
+	numbers = [t.strip() for t in (shipment.awb_number or "").split(",") if t.strip()]
+	urls = [u.strip() for u in (shipment.tracking_url or "").split(",") if u.strip()]
+	carriers = _parcel_carriers(shipment)
+	notify = setting.get("notify_customer_on_tracking_push")
+
+	# Sıraya güvenmek ancak saklanan id'ler ile bu gönderinin numaraları birebir
+	# karşılık geliyorsa doğru. İrsaliye birden çok gönderiyle çıktıysa id'ler
+	# birden çok gönderiye ait oluyor ve indeksle eşlemek, bir kolinin numarasını
+	# başka bir kolinin fulfillment'ına yazmak demek — müşteri o kutuyu tümden
+	# kaybeder. Sayılar tutmuyorsa tahmin etmek yerine duruyoruz.
+	if len(stored) != len(numbers):
+		reason = (
+			f"{len(stored)} fulfillment on the delivery note but {len(numbers)} "
+			f"tracking number(s) on {shipment.name} — cannot tell which belongs to which, "
+			"nothing rewritten"
+		)
+		create_shopify_log(
+			status="Success",
+			method="ecommerce_integrations.shopify.tracking.push_tracking",
+			message=f"Shopify order {order_id}: {reason}",
+		)
+		return {"delivery_note": dn.name, "retracked": [], "unsent": [reason]}
+
+	# Shopify'daki mevcut numaralar. Karşılaştırmadan yazmak, kancanın iki kez
+	# tetiklendiği her seferde müşteriye yeni bir kargo e-postası gönderirdi.
+	current = _fulfillment_tracking(setting, order_id)
+
+	retracked = []
+	unsent = []
+	for index, fulfillment_id in enumerate(stored):
+		number = numbers[index] if index < len(numbers) else None
+		if not number:
+			# Numarasız güncelleme, duran numarayı **siler**: bu uç nokta
+			# `tracking_info`'yu değiştiriyor, birleştirmiyor. Yazmaktansa
+			# dokunmamak doğru.
+			unsent.append(
+				_("fulfillment {0}: no tracking number in this shipment, left as it was").format(
+					fulfillment_id
+				)
+			)
+			continue
+		if current.get(str(fulfillment_id)) == number:
+			continue  # aynı numara zaten duruyor
+
+		_update_tracking(
+			setting,
+			fulfillment_id,
+			number,
+			urls[index] if index < len(urls) else None,
+			carriers.get(index + 1) or shipment.get("carrier"),
+			notify,
+		)
+		retracked.append(fulfillment_id)
+
+	if retracked:
+		create_shopify_log(
+			status="Success",
+			method="ecommerce_integrations.shopify.tracking.push_tracking",
+			message=(
+				f"Shopify order {order_id}: tracking rewritten on {len(retracked)} "
+				f"fulfillment(s) from {shipment.name} — reshipped after a failed delivery"
+				+ ((" — " + "; ".join(unsent)) if unsent else "")
+			),
+		)
+
+	return {"delivery_note": dn.name, "retracked": retracked, "unsent": unsent}
+
+
+def _fulfillment_tracking(setting, order_id):
+	"""{fulfillment_id: tracking_number} as Shopify holds it right now.
+
+	Read before writing so an unchanged number is left alone. `update_tracking`
+	notifies the customer when asked to, and the label hook can fire more than
+	once for one parcel — without this check every extra firing would be another
+	shipping e-mail for a parcel that had not moved.
+	"""
+	data = _get(setting, f"orders/{order_id}/fulfillments.json")
+	tracking = {}
+	for row in (data or {}).get("fulfillments") or []:
+		if row.get("id") is not None:
+			tracking[str(row["id"])] = row.get("tracking_number")
+	return tracking
 
 
 def _unsent_note(numbers, parcels):
@@ -420,6 +547,7 @@ def repair_tracking(shipment, notify=0):
 	carriers = _parcel_carriers(doc)
 
 	repaired = []
+	skipped = []
 	for row in doc.get("shipment_delivery_note") or []:
 		if not row.delivery_note:
 			continue
@@ -428,10 +556,18 @@ def repair_tracking(shipment, notify=0):
 			continue
 		ids = [f.strip() for f in str(stored).split(",") if f.strip()]
 		for index, fulfillment_id in enumerate(ids):
+			number = numbers[index] if index < len(numbers) else None
+			if not number:
+				# Numarasız güncelleme duran numarayı **siler**: bu uç nokta
+				# `tracking_info`'yu değiştiriyor, birleştirmiyor. Aracın kendisi
+				# tam da düzeltmeye çalıştığı hatayı yapıyordu — saklanan id
+				# sayısı takip numarası sayısından fazla olduğunda.
+				skipped.append(fulfillment_id)
+				continue
 			_update_tracking(
 				setting,
 				fulfillment_id,
-				numbers[index] if index < len(numbers) else None,
+				number,
 				urls[index] if index < len(urls) else None,
 				carriers.get(index + 1) or doc.get("carrier"),
 				notify,
@@ -439,7 +575,7 @@ def repair_tracking(shipment, notify=0):
 			repaired.append(fulfillment_id)
 		break  # aynı irsaliye koli başına tekrarlıyor
 
-	return {"repaired": repaired}
+	return {"repaired": repaired, "skipped": skipped}
 
 
 def _update_tracking(setting, fulfillment_id, number, url, carrier, notify=False):
