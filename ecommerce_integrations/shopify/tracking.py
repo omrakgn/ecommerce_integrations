@@ -306,10 +306,31 @@ def _retrack_delivery_note(setting, shipment, dn, order_id):
 			aranan = frozenset(wanted.keys())
 			bulunan = next((fid for fid, info in kalan.items() if info["items"] == aranan), None)
 			if not bulunan:
+				# En sık sebep: Shopify sipariş bölünmemiş, tek fulfillment bütün
+				# kalemleri kapsıyor. Bir fulfillment tek takip numarası ve tek
+				# taşıyıcı taşır, dolayısıyla iki ayrı taşıyıcıyla giden iki koli
+				# orada temsil edilemez — yazılacak "doğru" bir numara yok.
+				#
+				# Mesaj neyin eksik olduğunu değil, neden mümkün olmadığını
+				# söylüyor: eksik gibi okunursa insan koli eşleştirmesinde hata
+				# arar ve orada bir hata yoktur.
+				kapsam = []
+				for fid, info in current.items():
+					kapsam.append("%s [%s]" % (fid, ", ".join(sorted(info["items"])) or "?"))
+				tasiyicilar = []
+				for _p_no, _w, _n, _u, c in pairing:
+					if c and c not in tasiyicilar:
+						tasiyicilar.append(c)
 				reason = (
-					"no fulfillment on Shopify covers exactly "
-					+ ", ".join(sorted(aranan))
-					+ " — nothing rewritten"
+					"parcel %s holds %s, and no fulfillment covers exactly that. "
+					"Shopify has %d fulfillment(s): %s. This shipment has %d parcels "
+					"carried by %s. A fulfillment holds one tracking number and one "
+					"carrier, so parcels split across carriers cannot be told apart "
+					"there — split the fulfillment in Shopify to give each parcel its "
+					"own tracking. Nothing rewritten."
+					% (_parcel_no, ", ".join(sorted(aranan)), len(current),
+					   "; ".join(kapsam), len(pairing),
+					   ", ".join(tasiyicilar) or (shipment.get("carrier") or "?"))
 				)
 				plan = []
 				break
