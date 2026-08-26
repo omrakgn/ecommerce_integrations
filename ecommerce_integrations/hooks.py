@@ -146,6 +146,13 @@ doc_events = {
 # burada yalnız dinliyoruz, o app kurulu değilse hiç tetiklenmez.
 shipment_label_created = ["ecommerce_integrations.shopify.tracking.push_tracking_on_label"]
 
+# Teslim anında Shopify'a fulfillment olayı gönder. Shopify'da müşterinin
+# gördüğü "Delivered" yazısı takip numarasından değil fulfillment
+# olaylarından geliyor; olay gönderilmezse gönderi hiç tamamlanmıyor.
+# Etiketi SendCloud basmışsa olayları o gönderiyor — buradan çıkanların
+# olayını gönderen kimse yoktu.
+shipment_delivered = ["ecommerce_integrations.shopify.tracking.push_delivery_on_delivered"]
+
 scheduler_events = {
 	"all": ["ecommerce_integrations.shopify.inventory.update_inventory_on_shopify"],
 	"daily": [

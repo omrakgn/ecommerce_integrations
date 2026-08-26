@@ -109,6 +109,107 @@ def push_tracking(shipment):
 	return {"fulfilled": results, "errors": errors, "unsent": unsent}
 
 
+def push_delivery_on_delivered(shipment=None, **kwargs):
+	"""Hook: `shipment_delivered` — tell Shopify the parcel arrived.
+
+	Shopify does not read the carrier. The word "Delivered" a customer sees comes
+	from a fulfillment **event**, not from the tracking number, so a fulfillment
+	created here stays open forever no matter what the carrier says. SendCloud
+	posts those events for the parcels it labels; the ones labelled in ERPNext had
+	nobody to post them.
+
+	Delivery is written with `db_set`, which fires no document event —
+	`erpnext_shipping` announces it instead and this listens. Absent that app the
+	hook is never fired and nothing here runs.
+	"""
+	if shipment:
+		push_delivery(shipment)
+
+
+@frappe.whitelist()
+def push_delivery(shipment):
+	"""Post a `delivered` fulfillment event for this shipment's fulfillments."""
+	setting = frappe.get_cached_doc(SETTING_DOCTYPE)
+	if not setting.is_enabled() or not setting.get("push_tracking_to_shopify"):
+		return {"skipped": "disabled"}
+
+	doc = frappe.get_doc("Shipment", shipment)
+
+	seen = []
+	for row in doc.get("shipment_delivery_note") or []:
+		if row.delivery_note and row.delivery_note not in seen:
+			seen.append(row.delivery_note)
+
+	posted = []
+	skipped = []
+	for delivery_note in seen:
+		dn = frappe.db.get_value(
+			"Delivery Note", delivery_note,
+			["name", "is_return", ORDER_ID_FIELD, FULLFILLMENT_ID_FIELD],
+			as_dict=True,
+		)
+		# İade irsaliyesi aslın sipariş numarasını taşıyor; ona teslim olayı
+		# göndermek müşterinin gidiş gönderisini teslim edilmiş gösterirdi.
+		if not dn or not dn.get(ORDER_ID_FIELD) or dn.get("is_return"):
+			continue
+
+		order_id = dn.get(ORDER_ID_FIELD)
+		current = _fulfillment_tracking(setting, order_id)
+
+		stored = [f.strip() for f in str(dn.get(FULLFILLMENT_ID_FIELD) or "").split(",") if f.strip()]
+		if not stored:
+			# Fulfillment'ı biz açmamışsak da olay göndermek doğru: SendCloud'un
+			# açtığı bir fulfillment, etiketi ERPNext'ten çıkmış bir koliye ait
+			# olabilir ve o durumda olayı gönderen kimse yoktur.
+			stored = list(current.keys())
+
+		for fulfillment_id in stored:
+			if str(fulfillment_id) not in current:
+				continue
+			try:
+				if _already_delivered(setting, order_id, fulfillment_id):
+					skipped.append(fulfillment_id)
+					continue
+				_post(
+					setting,
+					f"orders/{order_id}/fulfillments/{fulfillment_id}/events.json",
+					{"event": {"status": "delivered"}},
+				)
+				posted.append(fulfillment_id)
+			except Exception as exception:
+				create_shopify_log(
+					status="Error",
+					method="ecommerce_integrations.shopify.tracking.push_delivery",
+					message=f"Shipment {doc.name}, fulfillment {fulfillment_id}: {exception}",
+				)
+
+	if posted:
+		create_shopify_log(
+			status="Success",
+			method="ecommerce_integrations.shopify.tracking.push_delivery",
+			message=(
+				f"Delivered event posted for {len(posted)} fulfillment(s) from {doc.name}"
+				+ (f" — {len(skipped)} already delivered" if skipped else "")
+			),
+		)
+
+	return {"posted": posted, "already": skipped}
+
+
+def _already_delivered(setting, order_id, fulfillment_id):
+	"""Has a delivered event been posted for this fulfillment already?
+
+	Asked rather than remembered. Shopify keeps the events; a flag on our side
+	would be a second copy of that truth and would drift the first time an event
+	was posted from anywhere else — SendCloud posts them too.
+	"""
+	data = _get(setting, f"orders/{order_id}/fulfillments/{fulfillment_id}/events.json")
+	for event in (data or {}).get("fulfillment_events") or []:
+		if (event.get("status") or "").lower() == "delivered":
+			return True
+	return False
+
+
 @frappe.whitelist()
 def retrack_shipment(shipment):
 	"""Put this shipment's tracking on the fulfillments Shopify already holds.
