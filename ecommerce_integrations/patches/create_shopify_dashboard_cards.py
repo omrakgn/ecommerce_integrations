@@ -2,7 +2,26 @@ import json
 
 import frappe
 
-COMPANY = "Scarnatti"
+# Yer tutucu. Gercek sirket adi `execute()` icinde, KURULUM ANINDA cozuluyor.
+# Sabit yazilirsa bu yama baska bir kurulumda var olmayan bir sirkete filtreli
+# kartlar uretir: kartlar hata vermez, sadece sonsuza kadar sifir gosterir ve
+# neden sifir gosterdikleri gorunmez.
+COMPANY = "__COMPANY__"
+
+
+def _resolve_company():
+	"""Bu kurulumun sirketi, yoksa None."""
+	return frappe.defaults.get_global_default("company") or frappe.db.get_value(
+		"Company", {}, "name", order_by="creation"
+	)
+
+
+def _fill(filters, company):
+	"""Yer tutucuyu gercek sirket adiyla degistir."""
+	out = []
+	for f in filters:
+		out.append([company if x == COMPANY else x for x in f])
+	return out
 
 _SHOPIFY_SO = [
 	["Sales Order", "shopify_order_id", "is", "set"],
@@ -153,6 +172,15 @@ DASHBOARD_CHARTS = [
 
 
 def execute():
+	company = _resolve_company()
+	if not company:
+		frappe.log_error(
+			title="Shopify dashboard: no company",
+			message="No company on this site, so the cards were not created. "
+			"They filter on company and would show zero forever.",
+		)
+		return
+
 	for card in NUMBER_CARDS:
 		try:
 			if frappe.db.exists("Number Card", card["label"]):
@@ -166,7 +194,7 @@ def execute():
 					"document_type": card["document_type"],
 					"function": card["function"],
 					"aggregate_function_based_on": card.get("aggregate_field"),
-					"filters_json": json.dumps(card["filters"]),
+					"filters_json": json.dumps(_fill(card["filters"], company)),
 					"is_public": 1,
 					"show_percentage_stats": 0,
 				}
@@ -196,7 +224,7 @@ def execute():
 				"chart_type": chart["chart_type"],
 				"document_type": chart["document_type"],
 				"type": chart["type"],
-				"filters_json": json.dumps(chart["filters"]),
+				"filters_json": json.dumps(_fill(chart["filters"], company)),
 				"is_public": 1,
 			}
 			for key in (
