@@ -95,10 +95,26 @@ def _invoice_already_exists(so, shopify_order):
 	so both saw "no invoice" and both created one. Taking a row lock on the
 	Sales Order first serialises them: the second waits for the first to
 	commit, then reads the invoice it wrote.
+
+	**Both reads have to be locking reads.** MariaDB runs at REPEATABLE READ, so
+	a plain SELECT answers from the snapshot the transaction took at its first
+	read, which is long before the other worker committed. Locking the Sales
+	Order made the second worker wait, and then it asked the question against
+	that stale snapshot and still saw no invoice. Three orders were invoiced
+	twice this way on 27, 28 and 31 August, 1.4 to 1.9 seconds apart, with the
+	Sales Order lock already in place.
+
+	`for_update=True` on the invoice read makes it a locking read as well, and a
+	locking read sees the latest committed row rather than the snapshot.
 	"""
 	frappe.db.get_value("Sales Order", so.name, "name", for_update=True)
 	return bool(
-		frappe.db.get_value("Sales Invoice", {ORDER_ID_FIELD: shopify_order.get("id")}, "name")
+		frappe.db.get_value(
+			"Sales Invoice",
+			{ORDER_ID_FIELD: str(shopify_order.get("id"))},
+			"name",
+			for_update=True,
+		)
 	)
 
 
@@ -286,6 +302,11 @@ def make_payment_entry_against_sales_invoice(
 			f"The full amount is posted to the account of '{gateways[0]}'. "
 			f"Split it manually across the other gateways' accounts."
 		)
+		# `custom_remarks` olmadan bu not kaybolur: ERPNext'in `validate()`
+		# metodu `set_remarks()` calistiriyor ve o, isaret konulmamissa `remarks`
+		# alanini kendi sablonuyla bastan yaziyor. Not yaziliyordu, insert
+		# sirasinda siliniyordu ve kimse fark etmiyordu.
+		payment_entry.custom_remarks = 1
 		payment_entry.remarks = note
 		frappe.log_error(title="Shopify: split payment posted to one account", message=f"{doc.name}: {note}")
 
