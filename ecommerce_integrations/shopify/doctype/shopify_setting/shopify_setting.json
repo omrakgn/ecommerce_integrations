@@ -49,6 +49,9 @@
   "column_break_34",
   "sync_new_item_as_active",
   "upload_variants_as_items",
+  "item_group_sync_section",
+  "sync_item_groups",
+  "default_item_group",
   "inventory_sync_section",
   "warehouse",
   "price_list",
@@ -300,6 +303,26 @@
    "fieldname": "fetch_shopify_locations",
    "fieldtype": "Button",
    "label": "Fetch Shopify Locations"
+  },
+  {
+   "fieldname": "item_group_sync_section",
+   "fieldtype": "Section Break",
+   "label": "Product Category Sync"
+  },
+  {
+   "default": "1",
+   "description": "On: Shopify product_type is mapped to ERPNext Item Group and a missing group is CREATED; the ERPNext Item Group is also written back to Shopify product_type. Off: neither direction touches categories, no Item Group is ever created, and new items land in the default category below. Product matching is unaffected: it is keyed on SKU and the Shopify product/variant id.",
+   "fieldname": "sync_item_groups",
+   "fieldtype": "Check",
+   "label": "Sync product categories with Shopify"
+  },
+  {
+   "depends_on": "eval:!doc.sync_item_groups",
+   "description": "Used when category sync is off. Pick a LEAF group, not a tree node. Leave empty to fall back to the root group, which is a tree node and a poor place for items.",
+   "fieldname": "default_item_group",
+   "fieldtype": "Link",
+   "label": "Default product category",
+   "options": "Item Group"
   },
   {
    "fieldname": "inventory_sync_section",

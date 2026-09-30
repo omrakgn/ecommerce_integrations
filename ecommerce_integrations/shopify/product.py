@@ -204,6 +204,17 @@ class ShopifyProduct:
 	def _get_item_group(self, product_type=None):
 		parent_item_group = get_root_of("Item Group")
 
+		# Kategori eslesmesi kapali: Shopify'in `product_type` alanina HIC
+		# bakilmiyor ve hicbir kosulda Item Group YARATILMIYOR. Kategori
+		# duzeni ERPNext'te elle yonetiliyor.
+		#
+		# Neden gerekti: `product_type` serbest metin ve Shopify'da yazilan her
+		# yeni deger burada kalici bir kategori aciyordu. Canlida bir yazim
+		# hatasi ("None Stock") ve tutarsiz adlandirma ("HYBRID") boyle birikti.
+		# Bkz. docs/shopify-kategori-eslesmesi.md
+		if not _is_item_group_sync_enabled(self.setting.get("sync_item_groups")):
+			return self.setting.get("default_item_group") or parent_item_group
+
 		if not product_type:
 			return parent_item_group
 
@@ -534,12 +545,35 @@ def map_erpnext_variant_to_shopify_variant(shopify_product: Product, erpnext_ite
 	return variant_product_id
 
 
+def _is_item_group_sync_enabled(value) -> bool:
+	"""Kategori eslesmesi acik mi.
+
+	`None` = alan `tabSingles`'da HIC yazilmamis. O durumda ACIK sayiliyor,
+	cunku bu ayar var olan davranisi korumak uzere geldi: yalniz kod
+	yuklenmesi kategori eslesmesini sessizce kapatmamali. Kapatma kararini
+	kullanici veriyor ve 0 olarak kaydediliyor.
+
+	Normalde `set_shopify_item_group_sync_default` yamasi degeri 1 yaziyor;
+	bu kontrol yamanin calismadigi kurulumlar icin ikinci emniyet.
+	"""
+	if value is None:
+		return True
+	return bool(cint(value))
+
+
 def map_erpnext_item_to_shopify(shopify_product: Product, erpnext_item):
 	"""Map erpnext fields to shopify, called both when updating and creating new products."""
 
 	shopify_product.title = erpnext_item.item_name
 	shopify_product.body_html = erpnext_item.description
-	shopify_product.product_type = erpnext_item.item_group
+
+	# Kategori eslesmesi kapali: Shopify'daki `product_type` OLDUGU GIBI
+	# kaliyor. ERPNext Item Group'u stok ve muhasebe duzeni, Shopify
+	# `product_type`'i vitrin siniflamasi; ayar kapaliyken ikisi bagimsiz.
+	# Tek yonu kapatip bunu birakmak, ERPNext'te elle verilen kategoriyi
+	# Shopify vitrinine yazardi.
+	if _is_item_group_sync_enabled(frappe.db.get_single_value(SETTING_DOCTYPE, "sync_item_groups")):
+		shopify_product.product_type = erpnext_item.item_group
 
 	if erpnext_item.weight_uom in WEIGHT_TO_ERPNEXT_UOM_MAP.values():
 		# reverse lookup for key
