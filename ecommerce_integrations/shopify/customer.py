@@ -11,6 +11,7 @@ from ecommerce_integrations.shopify.constants import (
 	MODULE_NAME,
 	SETTING_DOCTYPE,
 )
+from ecommerce_integrations.utils.phone import international
 
 
 class ShopifyCustomer(EcommerceCustomer):
@@ -98,7 +99,16 @@ class ShopifyCustomer(EcommerceCustomer):
 		if shopify_customer.get("email"):
 			contact_fields["email_ids"] = [{"email_id": shopify_customer.get("email"), "is_primary": True}]
 
-		phone_no = shopify_customer.get("phone") or shopify_customer.get("default_address", {}).get("phone")
+		adres = (
+			shopify_customer.get("default_address")
+			or shopify_customer.get("billing_address")
+			or shopify_customer.get("shipping_address")
+			or {}
+		)
+		phone_no = shopify_customer.get("phone") or adres.get("phone")
+		# Adreste yazıldığı gibi gelen numara ("01627473889") gönderide
+		# reddediliyordu; ülkesine göre "+49..." biçimine çevriliyor.
+		phone_no = international(phone_no, adres.get("country_code"))
 
 		if validate_phone_number(phone_no, throw=False):
 			contact_fields["phone_nos"] = [{"phone": phone_no, "is_primary_phone": True}]
@@ -121,7 +131,7 @@ def _map_address_fields(shopify_address, customer_name, address_type, email):
 		"email_id": email,
 	}
 
-	phone = shopify_address.get("phone")
+	phone = international(shopify_address.get("phone"), shopify_address.get("country_code"))
 	if validate_phone_number(phone, throw=False):
 		address_fields["phone"] = phone
 
