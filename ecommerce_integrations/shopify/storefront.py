@@ -19,8 +19,9 @@ Eski siparişler için `backfill()` konsoldan, deneme kipi varsayılan:
     print_report(r)
     frappe.db.rollback()
 
-Kaynak, entegrasyon kaydında saklanan sipariş verisi. Kayıtlar 120 günde siliniyor
-(hooks.py `default_log_clearing_doctypes`); daha eski siparişler boş kalır ve
+Kaynak, entegrasyon kaydında saklanan sipariş verisi. Başarılı kayıtlar 120 günde
+siliniyor (hooks.py `default_log_clearing_doctypes`; `clear_old_logs` yalnız
+`Success` siliyor, hatalı kayıtlar kalıyor). Daha eski siparişler boş kalır ve
 raporda sayılır.
 """
 
@@ -146,7 +147,7 @@ def backfill(dry_run=True, limit=None, examples=15):
 			if not dry_run:
 				frappe.db.set_value("Sales Order", so.name, degerler, update_modified=False)
 
-	# Kaydı silinmiş (120 günden eski) ya da Shopify'ın dil göndermediği siparişler.
+	# Başarılı kaydı silinmiş (120 günden eski) ya da Shopify'ın dil göndermediği siparişler.
 	bos = frappe.db.count(
 		"Sales Order",
 		filters={ORDER_ID_FIELD: ["is", "set"], STOREFRONT_LOCALE_FIELD: ["is", "not set"]},
