@@ -62,5 +62,10 @@ UTM_TERM_FIELD = "shopify_utm_term"
 LANDING_SITE_FIELD = "shopify_landing_site"
 REFERRING_SITE_FIELD = "shopify_referring_site"
 
+# storefront the order was placed in: Shopify's customer_locale ("nl-BE") and its
+# country part. Shopify does not record the domain; see shopify/storefront.py
+STOREFRONT_LOCALE_FIELD = "shopify_storefront_locale"
+STOREFRONT_COUNTRY_FIELD = "shopify_storefront_country"
+
 # ERPNext already defines the default UOMs from Shopify but names are different
 WEIGHT_TO_ERPNEXT_UOM_MAP = {"kg": "Kg", "g": "Gram", "oz": "Ounce", "lb": "Pound"}

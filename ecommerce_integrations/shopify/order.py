@@ -30,6 +30,7 @@ from ecommerce_integrations.shopify.constants import (
 )
 from ecommerce_integrations.shopify.customer import ShopifyCustomer
 from ecommerce_integrations.shopify.product import create_items_if_not_exist, get_item_code
+from ecommerce_integrations.shopify.storefront import get_storefront
 from ecommerce_integrations.shopify.utils import create_shopify_log
 from ecommerce_integrations.utils.price_list import get_dummy_price_list
 from ecommerce_integrations.utils.taxation import get_dummy_tax_category
@@ -150,6 +151,8 @@ def create_sales_order(shopify_order, setting, company=None):
 			DISCOUNT_CODES_FIELD: discount_info.get("codes"),
 			PAYMENT_METHOD_FIELD: payment_method,
 			**get_marketing_attribution(shopify_order),
+			# Language and country of the storefront ("nl-BE"); Shopify keeps no domain.
+			**get_storefront(shopify_order),
 		}
 		
 		# Discount is always taken from Shopify's per-item calculation

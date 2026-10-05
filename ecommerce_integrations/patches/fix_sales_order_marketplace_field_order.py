@@ -19,6 +19,8 @@ SHOPIFY_TAB_BLOCK = [
 	"shopify_utm_term",
 	"shopify_landing_site",
 	"shopify_referring_site",
+	"shopify_storefront_locale",
+	"shopify_storefront_country",
 ]
 
 
