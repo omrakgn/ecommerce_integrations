@@ -124,9 +124,19 @@ def create_credit_note(refund, setting) -> dict:
 	credit_note.submit()
 
 	message = f"Credit Note {credit_note.name} created for Shopify refund {refund_id}."
+
+	# Paranin geri gidisi: dekonta bagli odeme (bkz. refund_payment). Kurulamazsa
+	# dekont kalir, dekonta not duser.
+	from ecommerce_integrations.shopify.refund_payment import record_refund_payment
+
+	odeme_durumu, odeme_mesaji = record_refund_payment(credit_note, refund, setting)
+	message += f" Payment: {odeme_mesaji}."
+
 	if unmapped:
 		# Partial credit is still better than none, but it must be visible.
 		message += f" WARNING: unmapped refunded items skipped: {unmapped}."
+		return {"status": "Partial Success", "message": message}
+	if odeme_durumu == "manual":
 		return {"status": "Partial Success", "message": message}
 	return {"status": "Success", "message": message}
 
