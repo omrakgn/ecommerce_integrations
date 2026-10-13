@@ -175,6 +175,9 @@ scheduler_events = {
 	"weekly": [],
 	"monthly": [],
 	"cron": {
+		# Gunde bir, 06:35: webhook aninda "pending" olan Shopify iadelerinin odemesi.
+		# Saat basi ve gece yarisi dolu (docs/INTEGRATION-CONTRACTS.md zaman cizelgesi).
+		"35 6 * * *": ["ecommerce_integrations.shopify.refund_payment.retry_refund_payments"],
 		# Every five minutes
 		"*/5 * * * *": [
 			"ecommerce_integrations.unicommerce.order.sync_new_orders",

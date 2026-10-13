@@ -131,6 +131,8 @@ def create_credit_note(refund, setting) -> dict:
 
 	odeme_durumu, odeme_mesaji = record_refund_payment(credit_note, refund, setting)
 	message += f" Payment: {odeme_mesaji}."
+	if odeme_durumu == "pending":
+		message += " The daily check builds the payment once Shopify completes the refund."
 
 	if unmapped:
 		# Partial credit is still better than none, but it must be visible.
