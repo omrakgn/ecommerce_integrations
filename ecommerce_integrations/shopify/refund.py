@@ -10,8 +10,14 @@ Sales Invoice built from the original one.
 
 Stock is deliberately left alone (`update_stock = 0`), exactly as the Bol
 integration does: the original invoice did not move stock either (the Delivery
-Note did), so a Credit Note must not. Shopify's `restock` flag is recorded in the
-remarks so goods coming back can be received on a separate return Delivery Note.
+Note did), so a Credit Note must not. What Shopify did with the goods is written
+in the remarks, per line (`restock_type`): goods coming back are received on a
+separate return Delivery Note, goods taken off the order before shipping never
+left the warehouse.
+
+A refund without refunded items moves money only. When PayPal refuses the
+refund that carried the items, the money goes back in a second refund without
+them; that money belongs to the credit note already made (`_money_only_refund`).
 """
 
 import frappe
@@ -61,11 +67,9 @@ def create_credit_note(refund, setting) -> dict:
 	if existing:
 		return {"status": "Success", "message": f"Refund {refund_id} already credited by {existing}."}
 
-	invoice = frappe.db.get_value(
-		"Sales Invoice",
-		{ORDER_ID_FIELD: order_id, "docstatus": 1, "is_return": 0},
-		"name",
-	)
+	refunded_qty, unmapped = _refunded_quantities(refund)
+
+	invoice = _invoice_for_refund(order_id, refunded_qty)
 	if not invoice:
 		return {
 			"status": "Invalid",
@@ -75,20 +79,17 @@ def create_credit_note(refund, setting) -> dict:
 			),
 		}
 
-	refunded_qty, unmapped = _refunded_quantities(refund)
-
 	if not refunded_qty:
-		# Shipping-only or adjustment-only refunds carry no line items. Crediting
-		# them correctly needs the shipping/tax accounts, which we will not guess.
-		amount = _refund_amount(refund)
-		return {
-			"status": "Invalid",
-			"message": (
-				f"Refund {refund_id} on order {order_id} has no refunded line items "
-				f"(amount {amount}). Likely a shipping or adjustment refund — "
-				f"create the Credit Note manually against {invoice}."
-			),
-		}
+		if unmapped:
+			return {
+				"status": "Invalid",
+				"message": (
+					f"Refund {refund_id} on order {order_id}: none of the refunded items could be "
+					f"matched to an ERPNext item ({', '.join(unmapped)}). "
+					f"Create the Credit Note manually against {invoice}."
+				),
+			}
+		return _money_only_refund(refund, order_id, invoice, setting)
 
 	credit_note = make_sales_return(invoice)
 	credit_note.set(REFUND_ID_FIELD, refund_id)
@@ -143,6 +144,149 @@ def create_credit_note(refund, setting) -> dict:
 	return {"status": "Success", "message": message}
 
 
+def _invoice_for_refund(order_id, refunded_qty) -> str | None:
+	"""The order's invoice the refunded items were sold on.
+
+	An order can carry more than one invoice (a zero-value one added later, a
+	split billing). Taking whichever the database returned first credited the
+	wrong one: the refund of #1216 looked at a 0.00 invoice from August, found
+	none of its items there, and no credit note was made
+	(docs/shopify-ciro-mutabakati.md §3.2). The invoice holding the most of the
+	refunded items wins, the oldest on a tie; with no items to match, the oldest.
+	"""
+	invoices = frappe.get_all(
+		"Sales Invoice",
+		filters={ORDER_ID_FIELD: order_id, "docstatus": 1, "is_return": 0},
+		pluck="name",
+		order_by="posting_date asc, creation asc",
+	)
+	if not invoices:
+		return None
+	if len(invoices) == 1 or not refunded_qty:
+		return invoices[0]
+
+	best, best_count = invoices[0], 0
+	for name in invoices:
+		codes = set(
+			frappe.get_all(
+				"Sales Invoice Item",
+				filters={"parent": name, "parenttype": "Sales Invoice", "qty": [">", 0]},
+				pluck="item_code",
+			)
+		)
+		count = len(codes & set(refunded_qty))
+		if count > best_count:
+			best, best_count = name, count
+	return best
+
+
+def _money_only_refund(refund, order_id, invoice, setting) -> dict:
+	"""A refund without refunded items: money only, or an attempt that moved none.
+
+	September 2026 (docs/shopify-ciro-mutabakati.md §3.1): PayPal refused the
+	refund that carried the items, so its credit note was made without a
+	payment, and the money went back days later in a second refund with no
+	items. The log then said "create the Credit Note manually", which would have
+	credited the same goods twice. That money belongs to the credit note already
+	there, and its payment is attached to it.
+
+	An attempt that moved no money needs nothing. A refund whose amount matches
+	no credit note on the order (shipping, a goodwill amount) still needs a
+	person, as before: crediting it needs accounts we will not guess.
+	"""
+	from ecommerce_integrations.shopify.refund_payment import (
+		record_refund_payment,
+		refund_transactions,
+	)
+
+	refund_id = cstr(refund.get("id"))
+	hareketler = refund_transactions(refund)
+	tutar = 0.0
+	for t in hareketler:
+		if t.get("status") in ("success", "pending"):
+			tutar += flt(t.get("amount"))
+
+	if not tutar:
+		durumlar = ", ".join(sorted({cstr(t.get("status")) for t in hareketler})) or "no refund transaction"
+		return {
+			"status": "Success",
+			"message": (
+				f"Refund {refund_id} on order {order_id} refunded no items and moved no money "
+				f"({durumlar}). Nothing to credit."
+			),
+		}
+
+	adaylar = _credit_notes_for_amount(order_id, tutar)
+	odemesiz = [r for r in adaylar if not r.payment and abs(flt(r.outstanding_amount) + tutar) < 0.01]
+
+	if len(odemesiz) == 1:
+		credit_note = frappe.get_doc("Sales Invoice", odemesiz[0].name)
+		durum, mesaj = record_refund_payment(credit_note, refund, setting)
+		if durum == "created":
+			credit_note.add_comment(
+				"Comment",
+				f"Refund payment from Shopify refund {refund_id}: the refund that credited these "
+				f"goods moved no money, this one did. {mesaj}.",
+			)
+			return {
+				"status": "Success",
+				"message": f"Refund {refund_id} carries the money for {credit_note.name}: {mesaj}.",
+			}
+		if durum == "exists":
+			return {"status": "Success", "message": f"Refund {refund_id} for {credit_note.name}: {mesaj}."}
+		if durum == "pending":
+			neden = "Shopify reports it pending. Once it completes, enter"
+		else:
+			neden = f"the payment was not created ({mesaj}). Enter"
+		return {
+			"status": "Invalid",
+			"message": (
+				f"Refund {refund_id} carries the money for {credit_note.name}, but {neden} the "
+				f"payment (Pay) against {credit_note.name} by hand. Do not create another credit note."
+			),
+		}
+
+	if len(odemesiz) > 1:
+		neden = (
+			f"several unpaid credit notes of {tutar:.2f} on the order "
+			f"({', '.join(r.name for r in odemesiz)}). Enter the payment against the right one by hand"
+		)
+	elif adaylar:
+		neden = (
+			f"credit note {', '.join(r.name for r in adaylar)} of this amount is already settled. "
+			"Check that its payment is this refund; do not create another credit note"
+		)
+	else:
+		neden = (
+			f"no credit note of {tutar:.2f} on the order. Likely a shipping or adjustment refund: "
+			f"create the Credit Note manually against {invoice}"
+		)
+	return {
+		"status": "Invalid",
+		"message": f"Refund {refund_id} on order {order_id} has no refunded items (amount {tutar:.2f}); {neden}.",
+	}
+
+
+def _credit_notes_for_amount(order_id, amount) -> list:
+	"""The order's submitted credit notes of this amount, each with its payment if any."""
+	return frappe.db.sql(
+		f"""
+		select si.name, si.outstanding_amount,
+			(select pe.name from `tabPayment Entry Reference` per
+				join `tabPayment Entry` pe on pe.name = per.parent
+				where per.reference_doctype = 'Sales Invoice' and per.reference_name = si.name
+					and pe.docstatus = 1
+				limit 1) as payment
+		from `tabSales Invoice` si
+		where si.docstatus = 1 and si.is_return = 1 and si.{ORDER_ID_FIELD} = %(order)s
+			and abs(si.grand_total + %(amount)s) < 0.01
+		order by si.posting_date, si.creation
+		""",
+		{"order": order_id, "amount": flt(amount)},
+		as_dict=True,
+	)
+
+
 def _refunded_quantities(refund) -> tuple[dict, list]:
 	"""{item_code: refunded qty} plus the Shopify lines we could not map."""
 	quantities: dict[str, float] = {}
@@ -162,21 +306,51 @@ def _refunded_quantities(refund) -> tuple[dict, list]:
 	return quantities, unmapped
 
 
-def _refund_amount(refund) -> float:
-	"""Total actually refunded, summed over successful refund transactions."""
-	return sum(
-		flt(t.get("amount"))
-		for t in (refund.get("transactions") or [])
-		if t.get("kind") == "refund" and t.get("status") == "success"
-	)
-
-
 def _remarks(refund, unmapped) -> str:
 	parts = [f"Shopify refund {refund.get('id')}"]
 	if refund.get("note"):
 		parts.append(f"Note: {refund.get('note')}")
-	if refund.get("restock"):
-		parts.append("Shopify restocked these goods — receive them on a return Delivery Note.")
+	removed, returned, typed = _restock_lines(refund)
+	if removed:
+		parts.append(
+			f"Removed from the order before shipping: {', '.join(removed)}. "
+			"Nothing comes back: do not receive these on a return Delivery Note."
+		)
+	if returned:
+		parts.append(
+			f"Shopify restocked these goods: {', '.join(returned)}. Receive them on a return Delivery Note."
+		)
+	elif refund.get("restock") and not typed:
+		# Satir turu olmayan eski yuk: yalniz iade duzeyindeki isaret var.
+		parts.append("Shopify restocked these goods. Receive them on a return Delivery Note.")
 	if unmapped:
 		parts.append(f"Unmapped items not credited: {', '.join(unmapped)}")
 	return "\n".join(parts)
+
+
+def _restock_lines(refund) -> tuple[list, list, bool]:
+	"""(taken off before shipping, coming back, any line typed), from each line's `restock_type`.
+
+	`cancel`: the line was never fulfilled and was taken off the order (a size
+	changed before shipping, a cancelled pre-order). Nothing left the
+	warehouse, so nothing comes back. `return`, and the older `legacy_restock`:
+	shipped goods Shopify put back in stock. `no_restock`: neither.
+
+	The remark used to read only the refund's `restock` flag and told the
+	warehouse to receive goods that had never left: #1393, an 80x200 swapped
+	for a 90x200 before shipping (docs/shopify-ciro-mutabakati.md §3.3).
+	"""
+	removed, returned, typed = [], [], False
+	for line in refund.get("refund_line_items") or []:
+		if flt(line.get("quantity")) <= 0:
+			continue
+		kind = cstr(line.get("restock_type"))
+		if kind:
+			typed = True
+		item = line.get("line_item") or {}
+		label = f"{cstr(item.get('sku') or item.get('title') or item.get('variant_id'))} x{cint(line.get('quantity'))}"
+		if kind == "cancel":
+			removed.append(label)
+		elif kind in ("return", "legacy_restock"):
+			returned.append(label)
+	return removed, returned, typed
