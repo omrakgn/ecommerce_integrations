@@ -211,6 +211,18 @@ def _already_delivered(setting, order_id, fulfillment_id):
 
 
 @frappe.whitelist()
+def tracking_push_enabled():
+	"""Whether ERPNext sends tracking to Shopify ("Send tracking to Shopify from ERPNext").
+
+	The Shipment form shows "Update Shopify Tracking" only then: with the box off the
+	button can do nothing, `retrack_shipment` answers "disabled" (2026-10-17). Read on
+	the server so a user without access to Shopify Setting gets the same answer.
+	"""
+	setting = frappe.get_cached_doc(SETTING_DOCTYPE)
+	return bool(setting.is_enabled() and setting.get("push_tracking_to_shopify"))
+
+
+@frappe.whitelist()
 def retrack_shipment(shipment):
 	"""Put this shipment's tracking on the fulfillments Shopify already holds.
 

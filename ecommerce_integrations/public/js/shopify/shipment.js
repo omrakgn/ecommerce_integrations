@@ -19,11 +19,19 @@ frappe.ui.form.on("Shipment", {
 			return;
 		}
 
-		frm.add_custom_button(
-			__("Update Shopify Tracking"),
-			() => confirm_retrack(frm),
-			__("Reshipment")
-		);
+		// Yalnız "Send tracking to Shopify from ERPNext" açıkken: kapalıyken düğme hiçbir
+		// şey yapamıyor, sunucu "disabled" dönüyor. Ayarı sunucu okuyor (izin gerekmesin).
+		frappe.call({
+			method: "ecommerce_integrations.shopify.tracking.tracking_push_enabled",
+			callback(r) {
+				if (!r.message || frm.doc.docstatus !== 1) return;
+				frm.add_custom_button(
+					__("Update Shopify Tracking"),
+					() => confirm_retrack(frm),
+					__("Reshipment")
+				);
+			},
+		});
 	},
 });
 
