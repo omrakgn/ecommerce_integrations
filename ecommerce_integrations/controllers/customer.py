@@ -14,6 +14,16 @@ class EcommerceCustomer:
 
 		return bool(frappe.db.exists("Customer", {self.customer_id_field: self.customer_id}))
 
+	def has_contact(self) -> bool:
+		"""Is any Contact linked to this customer?"""
+		name = frappe.db.get_value("Customer", {self.customer_id_field: self.customer_id}, "name")
+		return bool(
+			name
+			and frappe.db.exists(
+				"Dynamic Link", {"parenttype": "Contact", "link_doctype": "Customer", "link_name": name}
+			)
+		)
+
 	def get_customer_doc(self):
 		"""Get ERPNext customer document."""
 		if self.is_synced():

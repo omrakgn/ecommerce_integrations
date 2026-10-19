@@ -86,34 +86,82 @@ class ShopifyCustomer(EcommerceCustomer):
 			old_address.save()
 
 	def create_customer_contact(self, shopify_customer: dict[str, Any]) -> None:
-		if not (shopify_customer.get("first_name") and shopify_customer.get("email")):
+		contact_fields = _map_contact_fields(shopify_customer)
+		if contact_fields:
+			super().create_customer_contact(contact_fields)
+
+	def ensure_contact(self, shopify_customer: dict[str, Any]) -> None:
+		"""
+		Give a returning customer the contact it never got.
+
+		The contact used to be made only with the customer, and only when
+		Shopify sent an e-mail; a customer who first ordered by phone stayed
+		without one for every later order (#1421, 2026-10-16). Only a customer
+		with no linked contact at all gets one, so nothing is duplicated.
+
+		A contact that cannot be saved must not cost the order: it is logged
+		and the order goes on.
+		"""
+		if self.has_contact():
 			return
+		frappe.db.savepoint("shopify_contact")
+		try:
+			self.create_customer_contact(shopify_customer)
+		except Exception:
+			frappe.db.rollback(save_point="shopify_contact")
+			frappe.log_error(title="Shopify: could not create contact", message=frappe.get_traceback())
 
-		contact_fields = {
-			"status": "Passive",
-			"first_name": shopify_customer.get("first_name"),
-			"last_name": shopify_customer.get("last_name"),
-			"unsubscribed": not shopify_customer.get("accepts_marketing"),
-		}
 
-		if shopify_customer.get("email"):
-			contact_fields["email_ids"] = [{"email_id": shopify_customer.get("email"), "is_primary": True}]
+def _map_contact_fields(shopify_customer: dict[str, Any]) -> dict[str, Any] | None:
+	"""
+	Contact fields for a Shopify customer, or None when there is no one to reach.
 
-		adres = (
-			shopify_customer.get("default_address")
-			or shopify_customer.get("billing_address")
-			or shopify_customer.get("shipping_address")
-			or {}
-		)
-		phone_no = shopify_customer.get("phone") or adres.get("phone")
-		# Adreste yazıldığı gibi gelen numara ("01627473889") gönderide
-		# reddediliyordu; ülkesine göre "+49..." biçimine çevriliyor.
-		phone_no = international(phone_no, adres.get("country_code"))
+	A name and one way to reach the customer are enough: e-mail or phone.
+	E-mail used to be required, so a customer who checked out with a phone
+	number only got no contact (#1421). The order's own e-mail stands in for
+	the customer's, and the address's name for a customer record without one;
+	ERPNext requires a first name, so a lone last name takes its place.
+	"""
+	adres = (
+		shopify_customer.get("default_address")
+		or shopify_customer.get("billing_address")
+		or shopify_customer.get("shipping_address")
+		or {}
+	)
+	first = cstr(shopify_customer.get("first_name")).strip()
+	last = cstr(shopify_customer.get("last_name")).strip()
+	if not (first or last):
+		first = cstr(adres.get("first_name")).strip()
+		last = cstr(adres.get("last_name")).strip()
+	if not first:
+		first, last = last, ""
+	if not first:
+		first = cstr(adres.get("name")).strip()
+	if not first:
+		return None
 
-		if validate_phone_number(phone_no, throw=False):
-			contact_fields["phone_nos"] = [{"phone": phone_no, "is_primary_phone": True}]
+	email = cstr(shopify_customer.get("email") or shopify_customer.get("order_email")).strip()
+	# Adreste yazıldığı gibi gelen numara ("01627473889") gönderide
+	# reddediliyordu; ülkesine göre "+49..." biçimine çevriliyor.
+	phone_no = international(
+		shopify_customer.get("phone") or shopify_customer.get("order_phone") or adres.get("phone"),
+		adres.get("country_code"),
+	)
+	has_phone = validate_phone_number(phone_no, throw=False)
+	if not (email or has_phone):
+		return None
 
-		super().create_customer_contact(contact_fields)
+	contact_fields = {
+		"status": "Passive",
+		"first_name": first,
+		"last_name": last or None,
+		"unsubscribed": not shopify_customer.get("accepts_marketing"),
+	}
+	if email:
+		contact_fields["email_ids"] = [{"email_id": email, "is_primary": True}]
+	if has_phone:
+		contact_fields["phone_nos"] = [{"phone": phone_no, "is_primary_phone": True}]
+	return contact_fields
 
 
 def _map_address_fields(shopify_address, customer_name, address_type, email):

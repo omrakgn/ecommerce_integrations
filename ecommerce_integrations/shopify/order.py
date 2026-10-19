@@ -53,6 +53,10 @@ def sync_sales_order(payload, request_id=None):
 		shopify_customer = order.get("customer") if order.get("customer") is not None else {}
 		shopify_customer["billing_address"] = order.get("billing_address", "")
 		shopify_customer["shipping_address"] = order.get("shipping_address", "")
+		# A customer who checks out by phone has no e-mail on the customer
+		# record; the order's own e-mail and phone fill in for the contact.
+		shopify_customer["order_email"] = order.get("email") or order.get("contact_email")
+		shopify_customer["order_phone"] = order.get("phone")
 		customer_id = shopify_customer.get("id")
 		if customer_id:
 			customer = ShopifyCustomer(customer_id=customer_id)
@@ -60,6 +64,7 @@ def sync_sales_order(payload, request_id=None):
 				customer.sync_customer(customer=shopify_customer)
 			else:
 				customer.update_existing_addresses(shopify_customer)
+				customer.ensure_contact(shopify_customer)
 
 		create_items_if_not_exist(order)
 
