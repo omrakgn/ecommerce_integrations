@@ -1,4 +1,4 @@
-Withdrawals,Cayma Beyanları
+Withdrawals,Cayma Beyanları,Withdrawal Form app
 The Withdrawal Form app is not set up in ERPNext yet.,Withdrawal Form uygulaması ERPNext'te henüz ayarlanmadı.
 Shopify Setting > Withdrawal Form App: Client ID and Client Secret.,Shopify Setting > Withdrawal Form App: Client ID ve Client Secret.
 This page opens only from the Shopify admin of the connected store.,Bu sayfa yalnız bağlı mağazanın Shopify yönetiminden açılır.
@@ -7,21 +7,15 @@ Withdrawal declarations are not available on this site.,Bu sitede cayma beyanlar
 The app that keeps them (multichannel_core) is not installed.,Onları tutan uygulama (multichannel_core) kurulu değil.
 Some items,Bazı ürünler
 Whole order,Siparişin tamamı
-Received,Alındı
-Reference,Referans
-Order,Sipariş
-Customer,Müşteri
-Withdrawn,Cayılan
-Status,Durum
+Received,Alındı,Withdrawal Form app
+Withdrawn,Cayılan,Withdrawal Form app
 Return Case,İade Vakası
 Nothing needs attention.,Bakılması gereken bir şey yok.
 No withdrawal declarations yet.,Henüz cayma beyanı yok.
 No declaration matches the search.,Aramaya uyan beyan yok.
 Declarations sent with the withdrawal button. Read only: decisions and corrections are made in ERPNext.,Cayma düğmesiyle gönderilen beyanlar. Yalnız okunur: kararlar ve düzeltmeler ERPNext'te yapılır.
 Needs attention,Bakılması gerekenler
-All,Tümü
 "Search reference, order, name or email","Referans, sipariş, ad ya da e-posta ara"
-Search,Ara
 Shows the last {0} declarations and every one that needs attention.,Son {0} beyanı ve bakılması gereken her beyanı gösterir.
 Withdrawal Form App,Withdrawal Form Uygulaması
 The Shopify app with the withdrawal button. Its page in the Shopify admin lists the withdrawal declarations. Both values are on the app's settings page in the Shopify developer dashboard.,"Cayma düğmesini taşıyan Shopify uygulaması. Uygulamanın Shopify yönetimindeki sayfası cayma beyanlarını listeler. İki değer de Shopify geliştirici panelinde, uygulamanın ayarlar sayfasında."

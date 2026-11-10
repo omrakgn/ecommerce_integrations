@@ -34,6 +34,9 @@ LIMIT = 200
 ATTENTION = ("Needs Check", "Not Found")
 ADMIN_ORIGIN = "https://admin.shopify.com"
 APP_BRIDGE = "https://cdn.shopify.com/shopifycloud/app-bridge.js"
+# Words that mean something else elsewhere in ERPNext ("Withdrawals" of a bank account) are
+# translated in this context only; an app's tr.csv row without one changes every screen.
+CONTEXT = "Withdrawal Form app"
 FIELDS = [
 	"name",
 	"status",
@@ -211,7 +214,7 @@ def head(client_id, title):
 
 def notice(message, hint, client_id):
 	return (
-		head(client_id, _("Withdrawals"))
+		head(client_id, _("Withdrawals", context=CONTEXT))
 		+ f'<body><main class="page"><div class="card notice"><p><strong>{escape(message)}</strong></p>'
 		+ f'<p class="muted">{escape(hint)}</p></div></main></body></html>'
 	)
@@ -256,11 +259,11 @@ def row_html(row, site):
 	).lower()
 	attention = "1" if status in ATTENTION else "0"
 	cells = (
-		(_("Received"), escape(received(row.received_at))),
+		(_("Received", context=CONTEXT), escape(received(row.received_at))),
 		(_("Reference"), reference),
 		(_("Order"), order),
 		(_("Customer"), customer),
-		(_("Withdrawn"), scope),
+		(_("Withdrawn", context=CONTEXT), scope),
 		(_("Status"), badge),
 		(_("Return Case"), case),
 	)
@@ -273,7 +276,7 @@ def row_html(row, site):
 
 
 def render(rows, client_id, site):
-	title = _("Withdrawals")
+	title = _("Withdrawals", context=CONTEXT)
 	if rows is None:
 		return notice(
 			_("Withdrawal declarations are not available on this site."),
@@ -285,11 +288,11 @@ def render(rows, client_id, site):
 	heads = "".join(
 		f"<th>{escape(label)}</th>"
 		for label in (
-			_("Received"),
+			_("Received", context=CONTEXT),
 			_("Reference"),
 			_("Order"),
 			_("Customer"),
-			_("Withdrawn"),
+			_("Withdrawn", context=CONTEXT),
 			_("Status"),
 			_("Return Case"),
 		)
