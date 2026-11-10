@@ -71,7 +71,11 @@
   "last_inventory_sync",
   "sales_partner_section",
   "enable_sales_partner_mapping",
-  "sales_partner_mapping"
+  "sales_partner_mapping",
+  "withdrawal_app_section",
+  "withdrawal_app_client_id",
+  "column_break_withdrawal_app",
+  "withdrawal_app_client_secret"
  ],
  "fields": [
   {
@@ -488,12 +492,34 @@
    "hidden": 1,
    "label": "Sales Partner Mapping (deprecated)",
    "options": "Shopify Sales Partner Mapping"
+  },
+  {
+   "collapsible": 1,
+   "description": "The Shopify app with the withdrawal button. Its page in the Shopify admin lists the withdrawal declarations. Both values are on the app's settings page in the Shopify developer dashboard.",
+   "fieldname": "withdrawal_app_section",
+   "fieldtype": "Section Break",
+   "label": "Withdrawal Form App"
+  },
+  {
+   "fieldname": "withdrawal_app_client_id",
+   "fieldtype": "Data",
+   "label": "Client ID"
+  },
+  {
+   "fieldname": "column_break_withdrawal_app",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Checks that the page is opened by the Shopify admin of this store.",
+   "fieldname": "withdrawal_app_client_secret",
+   "fieldtype": "Password",
+   "label": "Client Secret"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-18 00:00:00.000000",
+ "modified": "2026-11-10 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "shopify",
  "name": "Shopify Setting",

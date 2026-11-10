@@ -1,10 +1,12 @@
 # Withdrawal Form: cayma düğmesi Shopify uygulaması olarak
 
-Yasal "Vertrag widerrufen" düğmesi ve formu (§ 356a BGB). Uygulama yalnız temaya blok ekliyor:
-mağaza verisine hiçbir yetkisi yok, formun gönderdiği beyanı ERPNext işliyor
-(`multichannel_core.returns.withdrawal.submit`, bkz. hub'da `docs/cayma-butonu.md`).
+Yasal "Vertrag widerrufen" düğmesi ve formu (§ 356a BGB). Uygulama temaya blok ekliyor ve Shopify
+yönetiminde beyanları listeleyen bir sayfası var. Mağaza verisine hiçbir yetkisi yok: formun
+gönderdiği beyanı ERPNext işliyor (`multichannel_core.returns.withdrawal.submit`), yönetimdeki
+sayfayı da ERPNext sunuyor (bkz. hub'da `docs/cayma-butonu.md`).
 
-- **Tür:** yalnız uzantıdan oluşan uygulama, tek mağazaya özel dağıtımla kurulur; App Store'da yok.
+- **Tür:** kendi sunucusu olmayan uygulama (tema uzantısı + ERPNext'in sunduğu sayfa), tek mağazaya
+  özel dağıtımla kurulur; App Store'da yok.
 - **Sahibi:** dev.shopify.com'daki hesap. Client ID `shopify.app.toml`'da.
 - **Tema kodu sürümü** (`../../shopify_theme/withdrawal/`) yedek olarak duruyor; ikisinden yalnız biri
   kullanılır. Yedek eski düzende (düğme bir sayfaya gider, form o sayfada); bilerek güncellenmedi.
@@ -72,10 +74,30 @@ görülebilir: uygulamanın Admin API erişimini belirli sunuculara sınırlayan
 Store'daki uygulamalara zorunlu; bu uygulama Shopify API'sine hiç bağlanmıyor, sınırlanacak bir
 erişimi yok.
 
+## Shopify yönetimindeki sayfa: cayma beyanları (2026-11-10)
+
+Uygulamayı Shopify yönetiminde (Apps > Withdrawal Form) açınca cayma beyanlarının listesi
+görünür. Sayfayı ERPNext sunar (`application_url`,
+`ecommerce_integrations/shopify/withdrawal_app.py`); Shopify onu yönetimin içinde açar.
+
+- **Gösterilen:** son 200 beyan ve bakılması gereken her beyan (Needs Check, Not Found). Alındı
+  zamanı, WD- numarası (ERPNext'teki kayda bağlantı, yeni sekmede), sipariş numarası (Shopify'daki
+  siparişi açar), ad ve e-posta, tamamı mı bazı ürünler mi, durum, iade vakası. "Needs attention" ve
+  "All" sekmeleri, arama kutusu. Yalnız okunur: kararlar ve düzeltmeler ERPNext'te.
+- **Kim görür:** Shopify'da bu uygulamaya erişimi olan her personel. Sayfada ad ve e-posta var;
+  erişim Shopify'ın personel izinlerinden (Settings > Users > personel > Apps) sınırlanır.
+- **Güvenlik:** Shopify her açılışı uygulamanın Client secret'ıyla imzalıyor. ERPNext imzayı,
+  zamanı (en çok 10 dakika) ve mağazayı kontrol ediyor; biri tutmazsa liste gösterilmiyor.
+  Sayfayı yalnız Shopify yönetimi çerçeve içinde açabiliyor.
+- **Ayar (bir kez):** ERPNext > Shopify Setting > **Withdrawal Form App**: Client ID (bu dosyadaki
+  `client_id`) ve **Client Secret** (dev.shopify.com > Withdrawal Form > Settings). Secret yalnız
+  ERPNext'e girilir; kimseyle paylaşılmaz, depoya yazılmaz. Eksikse sayfa "not set up" der.
+- **Yayın:** `application_url` değişti; bir kez `shopify app deploy`.
+- **Dil:** Shopify yönetimi Türkçeyse sayfa Türkçe, değilse İngilizce.
+
 ## Tema düzenleyicide (her tema için)
 
-Uygulamayı Shopify yönetiminde açınca "Find this app in the pages where you work" yazar: normal.
-Uygulamanın kendi ekranı yok, her şey tema düzenleyicide.
+Uygulamanın tema tarafındaki her şeyi tema düzenleyicide.
 
 1. Önce temanın kopyasında çalışın: Online Store > Themes > ... > Duplicate.
 2. Kopya temada **Edit theme** (eski adıyla Customize; **…** menüsündeki "Edit code" değil).
