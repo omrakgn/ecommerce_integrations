@@ -38,6 +38,20 @@ alındı onayı e-postası atıyor ve siparişi bulursa iade vakasını açıyor
 6. **Canlıya aldıktan sonra Händlerbund düğmesini kaldırın** ya da uygulamada kapatın. Sitede
    tek bir cayma düğmesi olmalı.
 
+## Tema değişince (önemli)
+
+Bu bir Shopify uygulaması değil, temanın parçası. Üç dosya ve altbilgideki
+`{% render 'withdrawal-button' %}` satırı **yalnız bu temada** var.
+
+- **Yeni bir temaya geçilirse** ya da tema baştan kurulursa üç dosya ve altbilgi satırı yeni temaya
+  da eklenmeli, sayfanın şablonu yeniden `page.withdrawal` seçilmeli. Yoksa düğme sessizce kaybolur
+  ve site yasal düğmesiz kalır.
+- Yeni temayı yayınlamadan önce: altbilgide düğme var mı, formdan bir deneme beyanı gidiyor mu.
+- Temanın kendi sürüm güncellemeleri eklenen dosyalara genelde dokunmaz. Güncellemeden sonra yine de
+  düğmeye bir kez bakın.
+- Tema değişikliklerinden bağımsız bir çözüm isterseniz form bir Shopify "theme app extension"
+  olarak paketlenebilir (Partner hesabı ve küçük bir uygulama kaydı gerekir). Şimdilik yapılmadı.
+
 ## Değiştirmeyin
 
 - **Alan adları** (`full_name`, `order_reference`, `email`, `scope`, `items`, `reason`,
