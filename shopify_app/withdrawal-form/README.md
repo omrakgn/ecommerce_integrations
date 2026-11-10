@@ -58,9 +58,16 @@ Uygulamanın kendi ekranı yok, her şeyi tema düzenleyicide.
    form**. Bloğun ayarında "Email for withdrawals when the form cannot be sent" doldurulur.
 4. Düğme:
    - Altbilgide **Add block** listesinde "Withdrawal button" varsa onu ekleyin; yoksa
-   - **Theme settings > App embeds > Button on every page**'i açın.
+   - **App embeds > Withdrawal Form > Button on every page**'i açın. App embeds bu mağazanın
+     düzenleyicisinde **Theme settings (dişli) içinde en üstte**; bazı düzenleyicilerde solda ayrı
+     bir simge (2026-11-10).
 5. Önizlemede deneyin (Yapılacaklar 33'teki liste), sonra kopyayı yayınlayın.
 6. Händlerbund düğmesini kapatın; sitede tek düğme kalmalı.
+
+**İzinler:** ilk kurulum, uygulama dev.shopify.com'da oluşturulurken seçilen izinlerle (müşteri
+verisi okuma, tema yazma) yapıldı; bugünkü sürüm hiçbir izin istemiyor. Gereksiz izin kalmasın diye
+uygulama bir kez kaldırılıp aynı kurulum bağlantısıyla yeniden kurulmalı; kurulum ekranı izin
+istememeli.
 
 **Tema değişince:** yeni temada 3. ve 4. adım tekrarlanır (tıklama, kod yok). Yeni tema yayınlanmadan
 önce düğmeye ve formdan bir deneme beyanına bakılır.
