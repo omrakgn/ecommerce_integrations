@@ -15,7 +15,7 @@ mağaza verisine hiçbir yetkisi yok, formun gönderdiği beyanı ERPNext işliy
 |---|---|---|
 | `blocks/withdrawal-form.liquid` | Bir bölüme "Withdrawal form" bloğu | Form (ikinci adım, "Widerruf bestätigen") |
 | `blocks/withdrawal-button.liquid` | Altbilgiye "Withdrawal button" bloğu | Düğme (birinci adım), altbilgi uygulama bloğu kabul ediyorsa |
-| `blocks/withdrawal-button-embed.liquid` | Theme settings > App embeds > "Withdrawal button (every page)" | Düğme her sayfanın en altında, altbilgi blok kabul etmiyorsa |
+| `blocks/withdrawal-button-embed.liquid` | Theme settings > App embeds > "Button on every page" | Düğme her sayfanın en altında, altbilgi blok kabul etmiyorsa |
 | `snippets/withdrawal-link.liquid` | - | İki düğme biçiminin ortak bağlantısı |
 | `locales/*.json` | - | Metinler: DE, NL, FR, ES, EN (`en.default.json` varsayılan) |
 | `assets/withdrawal.js`, `.css` | - | Formu kuran betik (Shopify sınırı 10 KB; şu an 7 KB) ve stil |
@@ -55,7 +55,7 @@ Denetim (yayından önce, isteğe bağlı):
    be sent" doldurulur.
 4. Düğme:
    - Altbilgide **Add block** listesinde "Withdrawal button" varsa onu ekleyin; yoksa
-   - **Theme settings > App embeds > Withdrawal button (every page)**'i açın.
+   - **Theme settings > App embeds > Button on every page**'i açın.
 5. Önizlemede deneyin (Yapılacaklar 33'teki liste), sonra kopyayı yayınlayın.
 6. Händlerbund düğmesini kapatın; sitede tek düğme kalmalı.
 

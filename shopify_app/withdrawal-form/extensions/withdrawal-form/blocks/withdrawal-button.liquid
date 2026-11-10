@@ -1,6 +1,6 @@
 {%- comment -%}
   First step of the withdrawal function, as a block for the footer (for themes whose footer
-  takes app blocks). Use either this or the "Withdrawal button (every page)" app embed.
+  takes app blocks). Use either this or the "Button on every page" app embed.
 {%- endcomment -%}
 <div class="withdrawal-button-wrap" {{ block.shopify_attributes }}>
   {%- render 'withdrawal-link', link: block.settings.link -%}

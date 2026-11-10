@@ -9,7 +9,6 @@ application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2025-10"
