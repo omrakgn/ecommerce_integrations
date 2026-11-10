@@ -1,0 +1,24 @@
+{%- comment -%}
+  First step of the withdrawal function on every page, for themes whose footer takes no app
+  blocks: turned on once under Theme settings > App embeds, it adds the button at the very
+  end of every page, below the footer. Use either this or the "Withdrawal button" block.
+{%- endcomment -%}
+<div class="withdrawal-bar">
+  {%- render 'withdrawal-link', link: block.settings.link -%}
+</div>
+
+{% schema %}
+{
+  "name": "Withdrawal button (every page)",
+  "target": "body",
+  "stylesheet": "withdrawal.css",
+  "settings": [
+    {
+      "type": "url",
+      "id": "link",
+      "label": "Withdrawal page",
+      "info": "Empty: the page with the address /pages/vertrag-widerrufen."
+    }
+  ]
+}
+{% endschema %}

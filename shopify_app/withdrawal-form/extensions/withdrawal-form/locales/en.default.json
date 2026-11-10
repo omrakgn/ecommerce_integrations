@@ -1,0 +1,23 @@
+{
+  "withdrawal": {
+    "button": "Withdraw from contract here",
+    "noscript": "Please send your withdrawal by email to {{ email }}.",
+    "title": "Withdraw from contract",
+    "intro": "Use this form to withdraw from your contract with us. You will receive an acknowledgement of receipt by email straight away.",
+    "name": "First and last name",
+    "order": "Order number",
+    "order_hint": "Shown in your order confirmation, e.g. #1421.",
+    "email": "Email address for the acknowledgement",
+    "scope": "What do you want to withdraw from?",
+    "scope_all": "The whole order",
+    "scope_some": "Only some items",
+    "items": "Which items?",
+    "reason": "Reason (optional)",
+    "confirm": "Confirm withdrawal",
+    "sending": "Sending...",
+    "done_title": "We have received your withdrawal declaration",
+    "done": "Received on {date}. We have sent the acknowledgement to {email}. Reference: {ref}.",
+    "not_found": "Please note: we could not find order {order}. Please check the number. If it is correct, write to us at {contact} with your order confirmation.",
+    "error": "Your declaration could not be sent just now. Please try again or send your withdrawal by email to {fallback}."
+  }
+}

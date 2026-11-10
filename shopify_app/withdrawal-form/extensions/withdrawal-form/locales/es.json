@@ -1,0 +1,23 @@
+{
+  "withdrawal": {
+    "button": "Desistir del contrato aquí",
+    "noscript": "Envíe su desistimiento por correo electrónico a {{ email }}.",
+    "title": "Desistir del contrato",
+    "intro": "Con este formulario desiste de su contrato con nosotros. Tras el envío recibirá de inmediato un acuse de recibo por correo electrónico.",
+    "name": "Nombre y apellidos",
+    "order": "Número de pedido",
+    "order_hint": "Figura en la confirmación de su pedido, p. ej. #1421.",
+    "email": "Correo electrónico para el acuse de recibo",
+    "scope": "¿De qué desea desistir?",
+    "scope_all": "Todo el pedido",
+    "scope_some": "Solo algunos artículos",
+    "items": "¿Qué artículos?",
+    "reason": "Motivo (opcional)",
+    "confirm": "Confirmar el desistimiento",
+    "sending": "Enviando...",
+    "done_title": "Hemos recibido su declaración de desistimiento",
+    "done": "Recibida el {date}. Hemos enviado el acuse de recibo a {email}. Número de referencia: {ref}.",
+    "not_found": "Atención: no hemos encontrado el pedido {order}. Compruebe el número. Si es correcto, escríbanos a {contact} adjuntando la confirmación de su pedido.",
+    "error": "No se ha podido enviar su declaración. Inténtelo de nuevo o envíe su desistimiento por correo electrónico a {fallback}."
+  }
+}

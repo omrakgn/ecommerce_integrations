@@ -1,0 +1,24 @@
+# Withdrawal Form: an extension-only Shopify app, installed on one store by custom
+# distribution. It asks for no access to store data; it only adds theme blocks (the
+# "Vertrag widerrufen" button and form). The form posts to ERPNext, not to this app.
+# Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "f31e2cb3a14ad23d5b776ae47199009c"
+name = "Withdrawal Form"
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-10"
+
+[access_scopes]
+scopes = ""
+
+[auth]
+redirect_urls = ["https://shopify.dev/apps/default-app-home/api/auth"]
+
+[pos]
+embedded = false

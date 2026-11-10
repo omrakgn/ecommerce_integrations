@@ -1,0 +1,23 @@
+{
+  "withdrawal": {
+    "button": "Se rétracter du contrat ici",
+    "noscript": "Veuillez envoyer votre rétractation par e-mail à {{ email }}.",
+    "title": "Se rétracter du contrat",
+    "intro": "Ce formulaire vous permet de vous rétracter de votre contrat. Après l'envoi, vous recevez immédiatement un accusé de réception par e-mail.",
+    "name": "Prénom et nom",
+    "order": "Numéro de commande",
+    "order_hint": "Indiqué dans votre confirmation de commande, p. ex. #1421.",
+    "email": "Adresse e-mail pour l'accusé de réception",
+    "scope": "De quoi souhaitez-vous vous rétracter ?",
+    "scope_all": "Toute la commande",
+    "scope_some": "Seulement certains articles",
+    "items": "Quels articles ?",
+    "reason": "Motif (facultatif)",
+    "confirm": "Confirmer la rétractation",
+    "sending": "Envoi en cours...",
+    "done_title": "Nous avons reçu votre déclaration de rétractation",
+    "done": "Reçue le {date}. Nous avons envoyé l'accusé de réception à {email}. Numéro de dossier : {ref}.",
+    "not_found": "Remarque : nous n'avons pas trouvé la commande {order}. Veuillez vérifier le numéro. S'il est correct, écrivez-nous à {contact} en joignant votre confirmation de commande.",
+    "error": "Votre déclaration n'a pas pu être envoyée. Veuillez réessayer ou envoyer votre rétractation par e-mail à {fallback}."
+  }
+}

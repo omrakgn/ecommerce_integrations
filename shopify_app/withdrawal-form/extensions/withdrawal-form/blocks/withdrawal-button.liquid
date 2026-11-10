@@ -1,0 +1,23 @@
+{%- comment -%}
+  First step of the withdrawal function, as a block for the footer (for themes whose footer
+  takes app blocks). Use either this or the "Withdrawal button (every page)" app embed.
+{%- endcomment -%}
+<div class="withdrawal-button-wrap" {{ block.shopify_attributes }}>
+  {%- render 'withdrawal-link', link: block.settings.link -%}
+</div>
+
+{% schema %}
+{
+  "name": "Withdrawal button",
+  "target": "section",
+  "stylesheet": "withdrawal.css",
+  "settings": [
+    {
+      "type": "url",
+      "id": "link",
+      "label": "Withdrawal page",
+      "info": "Empty: the page with the address /pages/vertrag-widerrufen."
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,23 @@
+{
+  "withdrawal": {
+    "button": "Overeenkomst hier herroepen",
+    "noscript": "Stuur uw herroeping per e-mail naar {{ email }}.",
+    "title": "Overeenkomst herroepen",
+    "intro": "Met dit formulier herroept u uw overeenkomst met ons. Na het verzenden ontvangt u direct een ontvangstbevestiging per e-mail.",
+    "name": "Voor- en achternaam",
+    "order": "Bestelnummer",
+    "order_hint": "Staat in uw orderbevestiging, bijv. #1421.",
+    "email": "E-mailadres voor de ontvangstbevestiging",
+    "scope": "Wat wilt u herroepen?",
+    "scope_all": "De hele bestelling",
+    "scope_some": "Alleen bepaalde artikelen",
+    "items": "Welke artikelen?",
+    "reason": "Reden (vrijwillig)",
+    "confirm": "Herroeping bevestigen",
+    "sending": "Wordt verzonden...",
+    "done_title": "Wij hebben uw verklaring van herroeping ontvangen",
+    "done": "Ontvangen op {date}. De ontvangstbevestiging is verzonden naar {email}. Referentienummer: {ref}.",
+    "not_found": "Let op: wij konden bestelnummer {order} niet vinden. Controleer het nummer. Als het klopt, stuur ons dan uw orderbevestiging naar {contact}.",
+    "error": "Uw verklaring kon nu niet worden verzonden. Probeer het opnieuw of stuur uw herroeping per e-mail naar {fallback}."
+  }
+}

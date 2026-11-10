@@ -1,0 +1,10 @@
+{
+  "name": "withdrawal-form",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Withdrawal button and form (Vertrag widerrufen) as a Shopify theme app extension",
+  "scripts": {
+    "deploy": "shopify app deploy",
+    "info": "shopify app info"
+  }
+}

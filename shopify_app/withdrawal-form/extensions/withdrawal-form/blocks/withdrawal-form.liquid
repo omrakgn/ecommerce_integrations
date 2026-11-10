@@ -1,0 +1,58 @@
+{%- comment -%}
+  The withdrawal form, second step ("Widerruf bestätigen"). Add it to the page with handle
+  "vertrag-widerrufen". assets/withdrawal.js builds the form from the texts below, which come
+  from locales/ in the shopper's language.
+{%- endcomment -%}
+{%- assign wd_lang = request.locale.iso_code | slice: 0, 2 | downcase -%}
+<div class="withdrawal"
+  data-withdrawal
+  data-endpoint="{{ block.settings.endpoint | escape }}"
+  data-fallback="{{ block.settings.fallback_email | escape }}"
+  data-lang="{{ wd_lang }}"
+  {{ block.shopify_attributes }}>
+  <script type="application/json" data-withdrawal-texts>
+    {
+      "title": {{ 'withdrawal.title' | t | json }},
+      "intro": {{ 'withdrawal.intro' | t | json }},
+      "name": {{ 'withdrawal.name' | t | json }},
+      "order": {{ 'withdrawal.order' | t | json }},
+      "order_hint": {{ 'withdrawal.order_hint' | t | json }},
+      "email": {{ 'withdrawal.email' | t | json }},
+      "scope": {{ 'withdrawal.scope' | t | json }},
+      "scope_all": {{ 'withdrawal.scope_all' | t | json }},
+      "scope_some": {{ 'withdrawal.scope_some' | t | json }},
+      "items": {{ 'withdrawal.items' | t | json }},
+      "reason": {{ 'withdrawal.reason' | t | json }},
+      "confirm": {{ 'withdrawal.confirm' | t | json }},
+      "sending": {{ 'withdrawal.sending' | t | json }},
+      "done_title": {{ 'withdrawal.done_title' | t | json }},
+      "done": {{ 'withdrawal.done' | t | json }},
+      "not_found": {{ 'withdrawal.not_found' | t | json }},
+      "error": {{ 'withdrawal.error' | t | json }}
+    }
+  </script>
+  <noscript>{{ 'withdrawal.noscript' | t: email: block.settings.fallback_email }}</noscript>
+</div>
+
+{% schema %}
+{
+  "name": "Withdrawal form",
+  "target": "section",
+  "javascript": "withdrawal.js",
+  "stylesheet": "withdrawal.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "endpoint",
+      "label": "ERPNext address",
+      "default": "https://erp.scarnatti.com/api/method/multichannel_core.returns.withdrawal.submit"
+    },
+    {
+      "type": "text",
+      "id": "fallback_email",
+      "label": "Email for withdrawals when the form cannot be sent",
+      "info": "Shown only if ERPNext cannot be reached. A withdrawal by email is valid too."
+    }
+  ]
+}
+{% endschema %}

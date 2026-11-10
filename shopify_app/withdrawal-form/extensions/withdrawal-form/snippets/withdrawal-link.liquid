@@ -1,0 +1,15 @@
+{%- comment -%}
+  The button itself, shared by the footer block and the app embed. Its label comes from
+  locales/ in the shopper's language ("Vertrag widerrufen" in German, as the law words it).
+  Target: the chosen page, else the page with handle "vertrag-widerrufen" (its address in
+  the shopper's language), else that handle under the current language folder.
+{%- endcomment -%}
+{%- assign wd_page = pages['vertrag-widerrufen'] -%}
+{%- if link != blank -%}
+  {%- assign wd_url = link -%}
+{%- elsif wd_page != empty and wd_page.url != blank -%}
+  {%- assign wd_url = wd_page.url -%}
+{%- else -%}
+  {%- assign wd_url = routes.root_url | append: '/pages/vertrag-widerrufen' | replace: '//', '/' -%}
+{%- endif -%}
+<a href="{{ wd_url }}" class="withdrawal-button">{{ 'withdrawal.button' | t }}</a>

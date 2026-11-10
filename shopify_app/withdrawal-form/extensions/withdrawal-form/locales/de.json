@@ -1,0 +1,23 @@
+{
+  "withdrawal": {
+    "button": "Vertrag widerrufen",
+    "noscript": "Bitte senden Sie Ihren Widerruf per E-Mail an {{ email }}.",
+    "title": "Vertrag widerrufen",
+    "intro": "Mit diesem Formular widerrufen Sie Ihren Vertrag mit uns. Nach dem Absenden erhalten Sie sofort eine Eingangsbestätigung per E-Mail.",
+    "name": "Vor- und Nachname",
+    "order": "Bestellnummer",
+    "order_hint": "Steht in Ihrer Bestellbestätigung, z. B. #1421.",
+    "email": "E-Mail-Adresse für die Eingangsbestätigung",
+    "scope": "Was möchten Sie widerrufen?",
+    "scope_all": "Die gesamte Bestellung",
+    "scope_some": "Nur einzelne Artikel",
+    "items": "Welche Artikel?",
+    "reason": "Grund (freiwillig)",
+    "confirm": "Widerruf bestätigen",
+    "sending": "Wird gesendet...",
+    "done_title": "Ihre Widerrufserklärung ist eingegangen",
+    "done": "Eingegangen am {date}. Die Eingangsbestätigung haben wir an {email} geschickt. Vorgangsnummer: {ref}.",
+    "not_found": "Hinweis: Wir konnten die Bestellnummer {order} nicht finden. Bitte prüfen Sie die Nummer. Wenn sie richtig ist, schreiben Sie uns mit Ihrer Bestellbestätigung an {contact}.",
+    "error": "Ihre Erklärung konnte gerade nicht übermittelt werden. Bitte versuchen Sie es erneut oder senden Sie Ihren Widerruf per E-Mail an {fallback}."
+  }
+}
