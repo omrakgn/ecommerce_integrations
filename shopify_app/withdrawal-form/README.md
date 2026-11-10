@@ -47,12 +47,15 @@ Denetim (yayından önce, isteğe bağlı):
 
 ## Tema düzenleyicide (her tema için)
 
+Uygulamayı Shopify yönetiminde açınca "Find this app in the pages where you work" yazar: normal.
+Uygulamanın kendi ekranı yok, her şeyi tema düzenleyicide.
+
 1. Önce temanın kopyasında çalışın: Online Store > Themes > ... > Duplicate.
 2. Sayfa: Online Store > Pages > Add page, başlık `Vertrag widerrufen`, adres (handle)
    `vertrag-widerrufen`. Başlığı öteki dillere çevirin (Translate & Adapt).
-3. Kopya temada **Customize** > sayfa seçiciden *Vertrag widerrufen* > **Add block** (ya da Add
-   section > Apps) > **Withdrawal form**. Bloğun ayarında "Email for withdrawals when the form cannot
-   be sent" doldurulur.
+3. Kopya temada **Edit theme** (eski adıyla Customize; **…** menüsündeki "Edit code" değil) >
+   sayfa seçiciden *Vertrag widerrufen* > **Add block** (ya da Add section > Apps) > **Withdrawal
+   form**. Bloğun ayarında "Email for withdrawals when the form cannot be sent" doldurulur.
 4. Düğme:
    - Altbilgide **Add block** listesinde "Withdrawal button" varsa onu ekleyin; yoksa
    - **Theme settings > App embeds > Button on every page**'i açın.
