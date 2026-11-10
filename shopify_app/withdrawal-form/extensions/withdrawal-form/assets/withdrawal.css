@@ -1,49 +1,126 @@
-/* Withdrawal button and form. Colours follow the theme's text colour (currentColor);
-   theme colour variables are comma triplets ("18,18,18"), the fallbacks follow suit. */
+/* Withdrawal button and form window.
 
-.withdrawal, .withdrawal *, .withdrawal *::before, .withdrawal *::after,
-.withdrawal-button-wrap, .withdrawal-bar { box-sizing: border-box; }
-.withdrawal [hidden] { display: none !important; }
+   Look: every color, corner and font goes through a --wd-* variable. The block settings in the
+   theme editor set them on the wrapper; the theme's own CSS can set them too, or style the
+   .withdrawal-* classes directly (README, "Görünüm"):
+     --wd-button, --wd-button-text, --wd-button-radius, --wd-align   the button
+     --wd-surface, --wd-text, --wd-radius, --wd-font, --wd-heading-font   the window
+     --wd-accent, --wd-accent-text, --wd-control-radius   the confirm button and the fields
+   Unset, the window is white with dark text, so it stays readable whatever form the theme's
+   own color variables take (hex, rgb triplets, oklch). The confirm button takes the theme's
+   primary button colors where the theme names them --btn-1-*. */
 
-.withdrawal { max-width: 40rem; margin-inline: auto; padding: 2rem 1rem 4rem; }
-.withdrawal-title { margin-block: 0 0.75rem; }
-.withdrawal-intro { margin-block: 0 1.5rem; }
-.withdrawal-form { display: grid; gap: 1.1rem; }
-.withdrawal-field { display: grid; gap: 0.35rem; }
-.withdrawal-field label, .withdrawal-field legend { font-weight: 600; }
-.withdrawal-field input[type="text"], .withdrawal-field input[type="email"], .withdrawal-field textarea {
-  width: 100%; padding: 0.7rem 0.8rem; font: inherit; font-size: 1rem;
-  border: 1px solid rgba(var(--color-foreground, 0, 0, 0), 0.35); border-radius: 4px;
-  background: transparent; color: inherit;
+.withdrawal-button-wrap, .withdrawal-bar, .withdrawal-button,
+.withdrawal-dialog, .withdrawal-dialog *, .withdrawal-dialog *::before, .withdrawal-dialog *::after {
+  box-sizing: border-box;
 }
-.withdrawal-field textarea { min-height: 6rem; resize: vertical; }
-.withdrawal-hint { font-size: 0.875em; opacity: 0.75; }
-.withdrawal-field fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
-.withdrawal-field legend { padding: 0; margin-bottom: 0.35rem; }
-.withdrawal-choice { display: flex; gap: 0.5rem; align-items: center; font-weight: 400; }
-.withdrawal-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
-.withdrawal-submit {
-  justify-self: start; padding: 0.85rem 1.6rem; border: 0; border-radius: 4px; cursor: pointer;
-  font: inherit; font-weight: 600; color: rgb(var(--color-background, 255, 255, 255));
-  background: rgb(var(--color-foreground, 18, 18, 18));
-}
-.withdrawal-submit:disabled { opacity: 0.6; cursor: progress; }
-.withdrawal-status:empty { display: none; }
-.withdrawal-status { padding: 1rem; border-radius: 4px; border: 1px solid rgba(var(--color-foreground, 0, 0, 0), 0.2); }
-.withdrawal-status.is-error { border-color: #b3261e; }
-.withdrawal-done h2 { margin-block: 0 0.5rem; }
-.withdrawal-note { margin-top: 1rem; padding: 1rem; border-left: 4px solid #b26a00; background: rgba(178, 106, 0, 0.08); }
+.withdrawal-dialog [hidden] { display: none !important; }
 
 /* The first step: a visible button, not a plain link like the other legal links. */
-.withdrawal-button-wrap { padding-block: 0.75rem; }
+.withdrawal-button-wrap { display: flex; flex-wrap: wrap; justify-content: var(--wd-align, flex-start); padding-block: 0.75rem; }
+.withdrawal-bar { display: flex; flex-wrap: wrap; justify-content: var(--wd-align, center); padding: 1rem; }
 .withdrawal-button {
-  display: inline-block; padding: 0.7rem 1.2rem; border: 2px solid currentColor; border-radius: 4px;
-  font-weight: 600; text-decoration: none; color: inherit; line-height: 1.2;
+  display: inline-block; margin: 0; padding: 0.7rem 1.2rem; min-height: 2.75rem;
+  border: 2px solid var(--wd-button, currentColor); border-radius: var(--wd-button-radius, 4px);
+  background: transparent; color: var(--wd-button, currentColor);
+  font: inherit; font-weight: 600; line-height: 1.2; text-transform: none; letter-spacing: normal;
+  cursor: pointer;
 }
-.withdrawal-button:hover, .withdrawal-button:focus-visible { text-decoration: underline; }
-.withdrawal-bar { display: flex; justify-content: center; padding: 1rem; }
+.withdrawal-filled .withdrawal-button {
+  border-color: var(--wd-button, var(--btn-1-bg, #1f1f1f));
+  background: var(--wd-button, var(--btn-1-bg, #1f1f1f)); color: var(--wd-button-text, var(--btn-1-color, #fff));
+}
+.withdrawal-button:hover, .withdrawal-button:focus-visible { text-decoration: underline; text-underline-offset: 0.2em; }
+.withdrawal-button:focus-visible { outline: 2px solid var(--wd-button, currentColor); outline-offset: 2px; }
+.withdrawal-noscript { flex-basis: 100%; margin: 0.5rem 0 0; }
 
-@media (max-width: 480px) {
-  .withdrawal-submit { justify-self: stretch; }
-  .withdrawal-button { display: block; text-align: center; }
+/* The window. Phones get the whole screen. */
+html.withdrawal-lock, html.withdrawal-lock body { overflow: hidden; }
+.withdrawal-dialog {
+  width: min(40rem, calc(100vw - 2rem)); max-width: none;
+  max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem);
+  margin: auto; padding: 0; border: 0; border-radius: var(--wd-radius, 8px);
+  background: var(--wd-surface, #fff); color: var(--wd-text, #1f1f1f);
+  font-family: var(--wd-font, inherit); font-size: 1rem; line-height: 1.5; text-align: left;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+}
+.withdrawal-dialog[open] {
+  position: fixed; inset: 0; z-index: 2147483000; height: fit-content;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.withdrawal-dialog:not([open]) { display: none; }
+.withdrawal-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+
+.withdrawal { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1.75rem 1.75rem 2rem; }
+.withdrawal-close {
+  position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1;
+  display: grid; place-items: center; width: 2.75rem; height: 2.75rem; margin: 0; padding: 0;
+  border: 0; border-radius: 50%; background: var(--wd-surface, #fff); color: inherit;
+  font: 400 1.75rem/1 system-ui, sans-serif; cursor: pointer;
+}
+.withdrawal-close:hover { background: rgba(127, 127, 127, 0.15); }
+.withdrawal-close:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+
+.withdrawal-title {
+  margin: 0 2.5rem 0.75rem 0; font-family: var(--wd-heading-font, var(--font-heading-family, inherit));
+  font-size: 1.5rem; line-height: 1.25; font-weight: 600; color: inherit; text-transform: none; letter-spacing: normal;
+}
+.withdrawal-title:focus, .withdrawal-done h3:focus { outline: none; }
+.withdrawal-intro { margin: 0 0 1.5rem; }
+.withdrawal-form { display: grid; gap: 1.1rem; margin: 0; }
+.withdrawal-field { display: grid; gap: 0.35rem; }
+.withdrawal-field label, .withdrawal-field legend {
+  margin: 0; padding: 0; font-size: 0.95rem; font-weight: 600; color: inherit; text-transform: none; letter-spacing: normal;
+}
+.withdrawal-field input[type="text"], .withdrawal-field input[type="email"], .withdrawal-field textarea {
+  display: block; width: 100%; height: auto; min-height: 2.9rem; margin: 0; padding: 0.7rem 0.8rem;
+  font: inherit; font-size: 1rem; line-height: 1.4;
+  border: 1px solid #8a8a8a; border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: var(--wd-control-radius, 4px); background: transparent; color: inherit; box-shadow: none;
+}
+.withdrawal-field textarea { min-height: 5.5rem; resize: vertical; }
+.withdrawal-field input:focus-visible, .withdrawal-field textarea:focus-visible {
+  outline: 2px solid var(--wd-accent, var(--btn-1-bg, currentColor)); outline-offset: 1px;
+}
+.withdrawal-hint { font-size: 0.875rem; color: #555; color: color-mix(in srgb, currentColor 72%, transparent); }
+.withdrawal-field fieldset { display: grid; gap: 0.45rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.withdrawal-field legend { margin-bottom: 0.35rem; }
+.withdrawal-choice { display: flex; gap: 0.6rem; align-items: center; font-weight: 400 !important; cursor: pointer; }
+.withdrawal-choice input {
+  position: static; display: inline-block; flex: none; width: 1.15rem; height: 1.15rem; margin: 0;
+  opacity: 1; appearance: auto; -webkit-appearance: radio; accent-color: var(--wd-accent, var(--btn-1-bg, currentColor));
+}
+.withdrawal-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+.withdrawal-submit {
+  justify-self: start; margin: 0; padding: 0.85rem 1.6rem; min-height: 2.75rem; border: 0; cursor: pointer;
+  border-radius: var(--wd-control-radius, var(--btn-1-border-radius, 4px));
+  background: var(--wd-accent, var(--btn-1-bg, #1f1f1f)); color: var(--wd-accent-text, var(--btn-1-color, #fff));
+  font: inherit; font-family: var(--btn-1-font-family, inherit); font-weight: 600; line-height: 1.2;
+  text-transform: none; letter-spacing: normal;
+}
+.withdrawal-submit:hover { filter: brightness(1.12); }
+.withdrawal-submit:focus-visible { outline: 2px solid var(--wd-accent, var(--btn-1-bg, #1f1f1f)); outline-offset: 2px; }
+.withdrawal-submit:disabled { opacity: 0.6; cursor: progress; }
+
+.withdrawal-status:empty { display: none; }
+.withdrawal-status { margin-top: 1rem; }
+.withdrawal-status.is-error { padding: 1rem; border: 1px solid #b3261e; border-radius: 4px; background: #fdf3f2; color: #8c1d18; }
+.withdrawal-dialog[data-done] .withdrawal-status { margin-top: 0; }
+.withdrawal-done h3 { margin: 0 2.5rem 0.75rem 0; font-size: 1.25rem; line-height: 1.3; color: inherit; }
+.withdrawal-done p { margin: 0 0 1rem; }
+.withdrawal-note { padding: 1rem; border-left: 4px solid #b26a00; background: #fbf3e8; color: #4a2c00; }
+.withdrawal-done .withdrawal-submit { margin-top: 0.5rem; }
+
+@media (max-width: 600px) {
+  .withdrawal-dialog {
+    width: 100%; max-width: 100%; height: 100%; height: 100dvh; max-height: 100%; max-height: 100dvh;
+    margin: 0; border-radius: 0;
+  }
+  .withdrawal-dialog[open] { height: 100%; height: 100dvh; }
+  .withdrawal { flex: 1; padding: 1.25rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px)); }
+  .withdrawal-close { top: calc(0.25rem + env(safe-area-inset-top, 0px)); right: 0.25rem; }
+  .withdrawal-title { margin-top: env(safe-area-inset-top, 0px); }
+  .withdrawal-submit { justify-self: stretch; width: 100%; }
+  .withdrawal-bar .withdrawal-button { width: 100%; text-align: center; }
 }

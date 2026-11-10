@@ -1,0 +1,121 @@
+{%- comment -%}
+  The withdrawal function in two steps (§ 356a BGB / Art. 11a Directive 2011/83/EU), shared by
+  the footer block and the app embed. The button "Vertrag widerrufen" opens the form in a window
+  over the current page; "Widerruf bestätigen" sends it to ERPNext and the answer (time of
+  receipt, reference, a warning when the order is unknown) shows in the same window. No page is
+  needed. assets/withdrawal.js opens the window and sends the form. Texts come from locales/ in
+  the shopper's language. A link to "#vertrag-widerrufen" anywhere on the page opens the window
+  too (for emails and legal texts).
+
+  Look: the block settings become --wd-* variables on the wrapper; the theme's own CSS can set
+  the same variables or style the .withdrawal-* classes (README, "Görünüm").
+
+  Parameters: block (the app block or app embed), wrap_class.
+  Field names are what ERPNext reads: full_name, order_reference, email, scope, items, reason,
+  website (the trap for robots).
+{%- endcomment -%}
+{%- liquid
+  assign s = block.settings
+  assign p = 'wd-' | append: block.id | append: '-'
+  assign wd_lang = request.locale.iso_code | slice: 0, 2 | downcase
+  # The button text: the block's own wording for this language, else the standard one.
+  assign wd_label_key = 'label_' | append: wd_lang
+  assign wd_label = s[wd_label_key] | strip
+  if wd_label == blank
+    assign wd_label = 'withdrawal.button' | t
+  endif
+  assign wd_style = ''
+  if s.button_color != blank
+    assign wd_style = wd_style | append: '--wd-button:' | append: s.button_color | append: ';'
+  endif
+  if s.button_text_color != blank
+    assign wd_style = wd_style | append: '--wd-button-text:' | append: s.button_text_color | append: ';'
+  endif
+  if s.button_radius != blank and s.button_radius != 'default'
+    assign wd_style = wd_style | append: '--wd-button-radius:' | append: s.button_radius | append: ';'
+  endif
+  if s.button_align != blank and s.button_align != 'default'
+    assign wd_style = wd_style | append: '--wd-align:' | append: s.button_align | append: ';'
+  endif
+  if s.accent_color != blank
+    assign wd_style = wd_style | append: '--wd-accent:' | append: s.accent_color | append: ';'
+  endif
+  if s.accent_text_color != blank
+    assign wd_style = wd_style | append: '--wd-accent-text:' | append: s.accent_text_color | append: ';'
+  endif
+  if s.surface_color != blank
+    assign wd_style = wd_style | append: '--wd-surface:' | append: s.surface_color | append: ';'
+  endif
+  if s.text_color != blank
+    assign wd_style = wd_style | append: '--wd-text:' | append: s.text_color | append: ';'
+  endif
+  if s.window_radius != blank and s.window_radius != 'default'
+    assign wd_style = wd_style | append: '--wd-radius:' | append: s.window_radius | append: ';'
+  endif
+-%}
+<div class="{{ wrap_class }}{% if s.button_style == 'filled' %} withdrawal-filled{% endif %}"
+  {%- if wd_style != blank %} style="{{ wd_style | escape }}"{% endif %} {{ block.shopify_attributes }}>
+  <button type="button" class="withdrawal-button" data-withdrawal-open aria-haspopup="dialog">
+    {{- wd_label | escape -}}
+  </button>
+  {%- if s.fallback_email != blank -%}
+    <noscript><p class="withdrawal-noscript">{{ 'withdrawal.noscript' | t: email: s.fallback_email }}</p></noscript>
+  {%- endif %}
+  <dialog class="withdrawal-dialog" data-withdrawal aria-labelledby="{{ p }}title"
+    data-endpoint="{{ s.endpoint | escape }}" data-fallback="{{ s.fallback_email | escape }}" data-lang="{{ wd_lang }}">
+    <button type="button" class="withdrawal-close" data-withdrawal-close aria-label="{{ 'withdrawal.close' | t | escape }}">
+      <span aria-hidden="true">&times;</span>
+    </button>
+    <div class="withdrawal">
+      <h2 class="withdrawal-title" id="{{ p }}title" tabindex="-1">{{ 'withdrawal.title' | t }}</h2>
+      <p class="withdrawal-intro">{{ 'withdrawal.intro' | t }}</p>
+      <form class="withdrawal-form" novalidate>
+        <div class="withdrawal-field">
+          <label for="{{ p }}name">{{ 'withdrawal.name' | t }}</label>
+          <input type="text" id="{{ p }}name" name="full_name" autocomplete="name" required maxlength="140">
+        </div>
+        <div class="withdrawal-field">
+          <label for="{{ p }}order">{{ 'withdrawal.order' | t }}</label>
+          <input type="text" id="{{ p }}order" name="order_reference" required maxlength="60" aria-describedby="{{ p }}order-hint">
+          <span class="withdrawal-hint" id="{{ p }}order-hint">{{ 'withdrawal.order_hint' | t }}</span>
+        </div>
+        <div class="withdrawal-field">
+          <label for="{{ p }}email">{{ 'withdrawal.email' | t }}</label>
+          <input type="email" id="{{ p }}email" name="email" autocomplete="email" required maxlength="140">
+        </div>
+        <div class="withdrawal-field">
+          <fieldset>
+            <legend>{{ 'withdrawal.scope' | t }}</legend>
+            <label class="withdrawal-choice"><input type="radio" name="scope" value="all" checked> {{ 'withdrawal.scope_all' | t }}</label>
+            <label class="withdrawal-choice"><input type="radio" name="scope" value="some"> {{ 'withdrawal.scope_some' | t }}</label>
+          </fieldset>
+        </div>
+        <div class="withdrawal-field" data-withdrawal-items hidden>
+          <label for="{{ p }}items">{{ 'withdrawal.items' | t }}</label>
+          <textarea id="{{ p }}items" name="items" maxlength="1000"></textarea>
+        </div>
+        <div class="withdrawal-field">
+          <label for="{{ p }}reason">{{ 'withdrawal.reason' | t }}</label>
+          <textarea id="{{ p }}reason" name="reason" maxlength="1000"></textarea>
+        </div>
+        <div class="withdrawal-trap" aria-hidden="true">
+          <input type="text" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        <button type="submit" class="withdrawal-submit">{{ 'withdrawal.confirm' | t }}</button>
+      </form>
+      <div class="withdrawal-status" role="status" aria-live="polite"></div>
+    </div>
+    <script type="application/json" data-withdrawal-texts>
+      {
+        "confirm": {{ 'withdrawal.confirm' | t | json }},
+        "sending": {{ 'withdrawal.sending' | t | json }},
+        "done_title": {{ 'withdrawal.done_title' | t | json }},
+        "done": {{ 'withdrawal.done' | t | json }},
+        "not_found": {{ 'withdrawal.not_found' | t | json }},
+        "error": {{ 'withdrawal.error' | t | json }},
+        "error_retry": {{ 'withdrawal.error_retry' | t | json }},
+        "close": {{ 'withdrawal.close' | t | json }}
+      }
+    </script>
+  </dialog>
+</div>

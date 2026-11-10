@@ -1,23 +1,209 @@
 {%- comment -%}
-  First step of the withdrawal function on every page, for themes whose footer takes no app
-  blocks: turned on once under Theme settings > App embeds, it adds the button at the very
-  end of every page, below the footer. Use either this or the "Withdrawal button" block.
+  The withdrawal button on every page, for themes whose footer takes no app blocks: turned on
+  once under App embeds, it adds the button at the very end of every page, below the footer.
+  It opens the withdrawal form over the current page (snippets/withdrawal-dialog.liquid).
+  Use either this or the "Withdrawal button" block, not both.
 {%- endcomment -%}
-<div class="withdrawal-bar">
-  {%- render 'withdrawal-link', link: block.settings.link -%}
-</div>
+{%- render 'withdrawal-dialog', block: block, wrap_class: 'withdrawal-bar' -%}
 
 {% schema %}
 {
   "name": "Button on every page",
   "target": "body",
+  "javascript": "withdrawal.js",
   "stylesheet": "withdrawal.css",
   "settings": [
     {
-      "type": "url",
-      "id": "link",
-      "label": "Withdrawal page",
-      "info": "Empty: the page with the address /pages/vertrag-widerrufen."
+      "type": "text",
+      "id": "fallback_email",
+      "label": "Email for withdrawals when the form cannot be sent",
+      "info": "Shown if ERPNext cannot be reached or the browser runs no JavaScript. A withdrawal by email is valid too."
+    },
+    {
+      "type": "header",
+      "content": "Button text"
+    },
+    {
+      "type": "paragraph",
+      "content": "Empty: the standard wording. In Germany the button must say \"Vertrag widerrufen\" or something equally clear."
+    },
+    {
+      "type": "text",
+      "id": "label_de",
+      "label": "German",
+      "placeholder": "Vertrag widerrufen"
+    },
+    {
+      "type": "text",
+      "id": "label_nl",
+      "label": "Dutch",
+      "placeholder": "Overeenkomst hier herroepen"
+    },
+    {
+      "type": "text",
+      "id": "label_fr",
+      "label": "French",
+      "placeholder": "Se rétracter du contrat ici"
+    },
+    {
+      "type": "text",
+      "id": "label_es",
+      "label": "Spanish",
+      "placeholder": "Desistir del contrato aquí"
+    },
+    {
+      "type": "text",
+      "id": "label_en",
+      "label": "English",
+      "placeholder": "Withdraw from contract here"
+    },
+    {
+      "type": "header",
+      "content": "Button"
+    },
+    {
+      "type": "select",
+      "id": "button_style",
+      "label": "Style",
+      "options": [
+        {
+          "value": "outline",
+          "label": "Outline"
+        },
+        {
+          "value": "filled",
+          "label": "Filled"
+        }
+      ],
+      "default": "outline"
+    },
+    {
+      "type": "color",
+      "id": "button_color",
+      "label": "Color",
+      "info": "Empty: the text color around the button."
+    },
+    {
+      "type": "color",
+      "id": "button_text_color",
+      "label": "Text color (filled style)"
+    },
+    {
+      "type": "select",
+      "id": "button_radius",
+      "label": "Corners",
+      "options": [
+        {
+          "value": "default",
+          "label": "Default"
+        },
+        {
+          "value": "0",
+          "label": "Square"
+        },
+        {
+          "value": "4px",
+          "label": "Slightly rounded"
+        },
+        {
+          "value": "10px",
+          "label": "Rounded"
+        },
+        {
+          "value": "999px",
+          "label": "Pill"
+        }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "select",
+      "id": "button_align",
+      "label": "Alignment",
+      "options": [
+        {
+          "value": "default",
+          "label": "Default"
+        },
+        {
+          "value": "flex-start",
+          "label": "Left"
+        },
+        {
+          "value": "center",
+          "label": "Center"
+        },
+        {
+          "value": "flex-end",
+          "label": "Right"
+        }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "header",
+      "content": "Form window"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Confirm button",
+      "info": "Empty: the theme's primary button color."
+    },
+    {
+      "type": "color",
+      "id": "accent_text_color",
+      "label": "Confirm button text"
+    },
+    {
+      "type": "color",
+      "id": "surface_color",
+      "label": "Background",
+      "info": "Empty: white."
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text",
+      "info": "Empty: dark gray."
+    },
+    {
+      "type": "select",
+      "id": "window_radius",
+      "label": "Corners",
+      "options": [
+        {
+          "value": "default",
+          "label": "Default"
+        },
+        {
+          "value": "0",
+          "label": "Square"
+        },
+        {
+          "value": "4px",
+          "label": "Slightly rounded"
+        },
+        {
+          "value": "12px",
+          "label": "Rounded"
+        }
+      ],
+      "default": "default"
+    },
+    {
+      "type": "paragraph",
+      "content": "More styling: the theme's CSS can set the --wd-* variables or style the .withdrawal-* classes."
+    },
+    {
+      "type": "header",
+      "content": "Connection"
+    },
+    {
+      "type": "text",
+      "id": "endpoint",
+      "label": "ERPNext address",
+      "default": "https://erp.scarnatti.com/api/method/multichannel_core.returns.withdrawal.submit"
     }
   ]
 }

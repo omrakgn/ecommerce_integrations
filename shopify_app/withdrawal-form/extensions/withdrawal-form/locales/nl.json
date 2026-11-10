@@ -18,6 +18,8 @@
     "done_title": "Wij hebben uw verklaring van herroeping ontvangen",
     "done": "Ontvangen op {date}. De ontvangstbevestiging is verzonden naar {email}. Referentienummer: {ref}.",
     "not_found": "Let op: wij konden bestelnummer {order} niet vinden. Controleer het nummer. Als het klopt, stuur ons dan uw orderbevestiging naar {contact}.",
-    "error": "Uw verklaring kon nu niet worden verzonden. Probeer het opnieuw of stuur uw herroeping per e-mail naar {fallback}."
+    "error": "Uw verklaring kon nu niet worden verzonden. Probeer het opnieuw of stuur uw herroeping per e-mail naar {fallback}.",
+    "error_retry": "Uw verklaring kon nu niet worden verzonden. Probeer het opnieuw.",
+    "close": "Sluiten"
   }
 }

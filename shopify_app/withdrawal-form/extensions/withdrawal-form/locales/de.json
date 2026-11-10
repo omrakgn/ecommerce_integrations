@@ -18,6 +18,8 @@
     "done_title": "Ihre Widerrufserklärung ist eingegangen",
     "done": "Eingegangen am {date}. Die Eingangsbestätigung haben wir an {email} geschickt. Vorgangsnummer: {ref}.",
     "not_found": "Hinweis: Wir konnten die Bestellnummer {order} nicht finden. Bitte prüfen Sie die Nummer. Wenn sie richtig ist, schreiben Sie uns mit Ihrer Bestellbestätigung an {contact}.",
-    "error": "Ihre Erklärung konnte gerade nicht übermittelt werden. Bitte versuchen Sie es erneut oder senden Sie Ihren Widerruf per E-Mail an {fallback}."
+    "error": "Ihre Erklärung konnte gerade nicht übermittelt werden. Bitte versuchen Sie es erneut oder senden Sie Ihren Widerruf per E-Mail an {fallback}.",
+    "error_retry": "Ihre Erklärung konnte gerade nicht übermittelt werden. Bitte versuchen Sie es erneut.",
+    "close": "Schließen"
   }
 }

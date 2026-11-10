@@ -18,6 +18,8 @@
     "done_title": "Hemos recibido su declaración de desistimiento",
     "done": "Recibida el {date}. Hemos enviado el acuse de recibo a {email}. Número de referencia: {ref}.",
     "not_found": "Atención: no hemos encontrado el pedido {order}. Compruebe el número. Si es correcto, escríbanos a {contact} adjuntando la confirmación de su pedido.",
-    "error": "No se ha podido enviar su declaración. Inténtelo de nuevo o envíe su desistimiento por correo electrónico a {fallback}."
+    "error": "No se ha podido enviar su declaración. Inténtelo de nuevo o envíe su desistimiento por correo electrónico a {fallback}.",
+    "error_retry": "No se ha podido enviar su declaración. Inténtelo de nuevo.",
+    "close": "Cerrar"
   }
 }

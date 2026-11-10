@@ -18,6 +18,8 @@
     "done_title": "We have received your withdrawal declaration",
     "done": "Received on {date}. We have sent the acknowledgement to {email}. Reference: {ref}.",
     "not_found": "Please note: we could not find order {order}. Please check the number. If it is correct, write to us at {contact} with your order confirmation.",
-    "error": "Your declaration could not be sent just now. Please try again or send your withdrawal by email to {fallback}."
+    "error": "Your declaration could not be sent just now. Please try again or send your withdrawal by email to {fallback}.",
+    "error_retry": "Your declaration could not be sent just now. Please try again.",
+    "close": "Close"
   }
 }
