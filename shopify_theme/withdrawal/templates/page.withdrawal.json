@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "withdrawal-form",
+      "settings": {
+        "endpoint": "https://erp.scarnatti.com/api/method/multichannel_core.returns.withdrawal.submit",
+        "fallback_email": ""
+      }
+    }
+  },
+  "order": ["main"]
+}

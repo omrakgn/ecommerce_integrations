@@ -1,0 +1,310 @@
+{%- comment -%}
+  Withdrawal form ("Vertrag widerrufen", § 356a BGB / Art. 11a Directive 2011/83/EU).
+  The first step is the button in the footer (snippets/withdrawal-button.liquid), which leads
+  to the page using this section; the second step is the "Widerruf bestätigen" button below.
+  The declaration goes to ERPNext (multichannel_core.returns.withdrawal.submit), which keeps it,
+  sends the acknowledgement of receipt by email at once and opens the return case.
+  Rules that must stay: no login, no CAPTCHA, the reason stays optional.
+{%- endcomment -%}
+
+{%- assign lang = request.locale.iso_code | slice: 0, 2 | downcase -%}
+
+<div class="page-width withdrawal"
+  data-withdrawal
+  data-endpoint="{{ section.settings.endpoint | escape }}"
+  data-fallback="{{ section.settings.fallback_email | escape }}"
+  data-lang="{{ lang }}">
+  <noscript>
+    {%- case lang -%}
+      {%- when 'de' -%}Bitte senden Sie Ihren Widerruf per E-Mail an {{ section.settings.fallback_email }}.
+      {%- when 'nl' -%}Stuur uw herroeping per e-mail naar {{ section.settings.fallback_email }}.
+      {%- when 'fr' -%}Veuillez envoyer votre rétractation par e-mail à {{ section.settings.fallback_email }}.
+      {%- when 'es' -%}Envíe su desistimiento por correo electrónico a {{ section.settings.fallback_email }}.
+      {%- else -%}Please send your withdrawal by email to {{ section.settings.fallback_email }}.
+    {%- endcase -%}
+  </noscript>
+</div>
+
+<style>
+  /* Theme colour variables are comma triplets ("18,18,18"); the fallbacks follow suit. */
+  .withdrawal, .withdrawal *, .withdrawal *::before, .withdrawal *::after { box-sizing: border-box; }
+  .withdrawal [hidden] { display: none !important; }
+  .withdrawal { max-width: 40rem; padding-block: 2rem 4rem; }
+  .withdrawal h1 { margin-block: 0 0.75rem; }
+  .withdrawal-intro { margin-block: 0 1.5rem; }
+  .withdrawal-form { display: grid; gap: 1.1rem; }
+  .withdrawal-field { display: grid; gap: 0.35rem; }
+  .withdrawal-field label, .withdrawal-field legend { font-weight: 600; }
+  .withdrawal-field input[type="text"], .withdrawal-field input[type="email"], .withdrawal-field textarea {
+    width: 100%; padding: 0.7rem 0.8rem; font: inherit; font-size: 1rem;
+    border: 1px solid rgba(var(--color-foreground, 0, 0, 0), 0.35); border-radius: 4px; background: transparent; color: inherit;
+  }
+  .withdrawal-field textarea { min-height: 6rem; resize: vertical; }
+  .withdrawal-hint { font-size: 0.875em; opacity: 0.75; }
+  .withdrawal-field fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+  .withdrawal-choice { display: flex; gap: 0.5rem; align-items: center; font-weight: 400; }
+  .withdrawal-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  .withdrawal-status:empty { display: none; }
+  .withdrawal-status { padding: 1rem; border-radius: 4px; border: 1px solid rgba(var(--color-foreground, 0, 0, 0), 0.2); }
+  .withdrawal-status.is-error { border-color: #b3261e; }
+  .withdrawal-done h2 { margin-block: 0 0.5rem; }
+  .withdrawal-note { margin-top: 1rem; padding: 1rem; border-left: 4px solid #b26a00; background: rgba(178, 106, 0, 0.08); }
+</style>
+
+<script>
+  (function () {
+    var TEXTS = {
+      de: {
+        title: 'Vertrag widerrufen',
+        intro: 'Mit diesem Formular widerrufen Sie Ihren Vertrag mit uns. Nach dem Absenden erhalten Sie sofort eine Eingangsbestätigung per E-Mail.',
+        name: 'Vor- und Nachname',
+        order: 'Bestellnummer',
+        order_hint: 'Steht in Ihrer Bestellbestätigung, z. B. #1421.',
+        email: 'E-Mail-Adresse für die Eingangsbestätigung',
+        scope: 'Was möchten Sie widerrufen?',
+        scope_all: 'Die gesamte Bestellung',
+        scope_some: 'Nur einzelne Artikel',
+        items: 'Welche Artikel?',
+        reason: 'Grund (freiwillig)',
+        confirm: 'Widerruf bestätigen',
+        sending: 'Wird gesendet...',
+        done_title: 'Ihre Widerrufserklärung ist eingegangen',
+        done: 'Eingegangen am {date}. Die Eingangsbestätigung haben wir an {email} geschickt. Vorgangsnummer: {ref}.',
+        not_found: 'Hinweis: Wir konnten die Bestellnummer {order} nicht finden. Bitte prüfen Sie die Nummer. Wenn sie richtig ist, schreiben Sie uns mit Ihrer Bestellbestätigung an {contact}.',
+        error: 'Ihre Erklärung konnte gerade nicht übermittelt werden. Bitte versuchen Sie es erneut oder senden Sie Ihren Widerruf per E-Mail an {fallback}.'
+      },
+      nl: {
+        title: 'Overeenkomst herroepen',
+        intro: 'Met dit formulier herroept u uw overeenkomst met ons. Na het verzenden ontvangt u direct een ontvangstbevestiging per e-mail.',
+        name: 'Voor- en achternaam',
+        order: 'Bestelnummer',
+        order_hint: 'Staat in uw orderbevestiging, bijv. #1421.',
+        email: 'E-mailadres voor de ontvangstbevestiging',
+        scope: 'Wat wilt u herroepen?',
+        scope_all: 'De hele bestelling',
+        scope_some: 'Alleen bepaalde artikelen',
+        items: 'Welke artikelen?',
+        reason: 'Reden (vrijwillig)',
+        confirm: 'Herroeping bevestigen',
+        sending: 'Wordt verzonden...',
+        done_title: 'Wij hebben uw verklaring van herroeping ontvangen',
+        done: 'Ontvangen op {date}. De ontvangstbevestiging is verzonden naar {email}. Referentienummer: {ref}.',
+        not_found: 'Let op: wij konden bestelnummer {order} niet vinden. Controleer het nummer. Als het klopt, stuur ons dan uw orderbevestiging naar {contact}.',
+        error: 'Uw verklaring kon nu niet worden verzonden. Probeer het opnieuw of stuur uw herroeping per e-mail naar {fallback}.'
+      },
+      fr: {
+        title: 'Se rétracter du contrat',
+        intro: "Ce formulaire vous permet de vous rétracter de votre contrat. Après l'envoi, vous recevez immédiatement un accusé de réception par e-mail.",
+        name: 'Prénom et nom',
+        order: 'Numéro de commande',
+        order_hint: 'Indiqué dans votre confirmation de commande, p. ex. #1421.',
+        email: "Adresse e-mail pour l'accusé de réception",
+        scope: 'De quoi souhaitez-vous vous rétracter ?',
+        scope_all: 'Toute la commande',
+        scope_some: 'Seulement certains articles',
+        items: 'Quels articles ?',
+        reason: 'Motif (facultatif)',
+        confirm: 'Confirmer la rétractation',
+        sending: 'Envoi en cours...',
+        done_title: 'Nous avons reçu votre déclaration de rétractation',
+        done: "Reçue le {date}. Nous avons envoyé l'accusé de réception à {email}. Numéro de dossier : {ref}.",
+        not_found: "Remarque : nous n'avons pas trouvé la commande {order}. Veuillez vérifier le numéro. S'il est correct, écrivez-nous à {contact} en joignant votre confirmation de commande.",
+        error: "Votre déclaration n'a pas pu être envoyée. Veuillez réessayer ou envoyer votre rétractation par e-mail à {fallback}."
+      },
+      es: {
+        title: 'Desistir del contrato',
+        intro: 'Con este formulario desiste de su contrato con nosotros. Tras el envío recibirá de inmediato un acuse de recibo por correo electrónico.',
+        name: 'Nombre y apellidos',
+        order: 'Número de pedido',
+        order_hint: 'Figura en la confirmación de su pedido, p. ej. #1421.',
+        email: 'Correo electrónico para el acuse de recibo',
+        scope: '¿De qué desea desistir?',
+        scope_all: 'Todo el pedido',
+        scope_some: 'Solo algunos artículos',
+        items: '¿Qué artículos?',
+        reason: 'Motivo (opcional)',
+        confirm: 'Confirmar el desistimiento',
+        sending: 'Enviando...',
+        done_title: 'Hemos recibido su declaración de desistimiento',
+        done: 'Recibida el {date}. Hemos enviado el acuse de recibo a {email}. Número de referencia: {ref}.',
+        not_found: 'Atención: no hemos encontrado el pedido {order}. Compruebe el número. Si es correcto, escríbanos a {contact} adjuntando la confirmación de su pedido.',
+        error: 'No se ha podido enviar su declaración. Inténtelo de nuevo o envíe su desistimiento por correo electrónico a {fallback}.'
+      },
+      en: {
+        title: 'Withdraw from contract',
+        intro: 'Use this form to withdraw from your contract with us. You will receive an acknowledgement of receipt by email straight away.',
+        name: 'First and last name',
+        order: 'Order number',
+        order_hint: 'Shown in your order confirmation, e.g. #1421.',
+        email: 'Email address for the acknowledgement',
+        scope: 'What do you want to withdraw from?',
+        scope_all: 'The whole order',
+        scope_some: 'Only some items',
+        items: 'Which items?',
+        reason: 'Reason (optional)',
+        confirm: 'Confirm withdrawal',
+        sending: 'Sending...',
+        done_title: 'We have received your withdrawal declaration',
+        done: 'Received on {date}. We have sent the acknowledgement to {email}. Reference: {ref}.',
+        not_found: 'Please note: we could not find order {order}. Please check the number. If it is correct, write to us at {contact} with your order confirmation.',
+        error: 'Your declaration could not be sent just now. Please try again or send your withdrawal by email to {fallback}.'
+      }
+    };
+
+    var root = document.querySelector('[data-withdrawal]');
+    if (!root) return;
+    var lang = (root.getAttribute('data-lang') || 'en').slice(0, 2);
+    var t = TEXTS[lang] || TEXTS.en;
+    var endpoint = root.getAttribute('data-endpoint');
+    var fallback = root.getAttribute('data-fallback');
+
+    function fill(text, values) {
+      return text.replace(/\{(\w+)\}/g, function (match, key) {
+        return values[key] != null ? values[key] : '';
+      });
+    }
+
+    function make(tag, attrs, text) {
+      var node = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function field(id, label, input, hint) {
+      var wrap = make('div', { class: 'withdrawal-field' });
+      wrap.appendChild(make('label', { for: id }, label));
+      if (hint) {
+        var hintNode = make('span', { class: 'withdrawal-hint', id: id + '-hint' }, hint);
+        input.setAttribute('aria-describedby', id + '-hint');
+        wrap.appendChild(input);
+        wrap.appendChild(hintNode);
+      } else {
+        wrap.appendChild(input);
+      }
+      return wrap;
+    }
+
+    root.innerHTML = '';
+    root.appendChild(make('h1', {}, t.title));
+    root.appendChild(make('p', { class: 'withdrawal-intro' }, t.intro));
+
+    var formNode = make('form', { class: 'withdrawal-form', novalidate: '' });
+    var nameInput = make('input', { type: 'text', id: 'wd-name', name: 'full_name', autocomplete: 'name', required: '', maxlength: '140' });
+    var orderInput = make('input', { type: 'text', id: 'wd-order', name: 'order_reference', required: '', maxlength: '60' });
+    var emailInput = make('input', { type: 'email', id: 'wd-email', name: 'email', autocomplete: 'email', required: '', maxlength: '140' });
+    formNode.appendChild(field('wd-name', t.name, nameInput));
+    formNode.appendChild(field('wd-order', t.order, orderInput, t.order_hint));
+    formNode.appendChild(field('wd-email', t.email, emailInput));
+
+    var scopeWrap = make('div', { class: 'withdrawal-field' });
+    var fieldset = make('fieldset');
+    fieldset.appendChild(make('legend', {}, t.scope));
+    [['all', t.scope_all], ['some', t.scope_some]].forEach(function (pair, index) {
+      var choice = make('label', { class: 'withdrawal-choice' });
+      var radio = make('input', { type: 'radio', name: 'scope', value: pair[0] });
+      if (index === 0) radio.checked = true;
+      choice.appendChild(radio);
+      choice.appendChild(document.createTextNode(pair[1]));
+      fieldset.appendChild(choice);
+    });
+    scopeWrap.appendChild(fieldset);
+    formNode.appendChild(scopeWrap);
+
+    var itemsInput = make('textarea', { id: 'wd-items', name: 'items', maxlength: '1000' });
+    var itemsField = field('wd-items', t.items, itemsInput);
+    itemsField.hidden = true;
+    formNode.appendChild(itemsField);
+    formNode.appendChild(field('wd-reason', t.reason, make('textarea', { id: 'wd-reason', name: 'reason', maxlength: '1000' })));
+
+    // Robots fill every field; people never see this one.
+    var trap = make('div', { class: 'withdrawal-trap', 'aria-hidden': 'true' });
+    trap.appendChild(make('input', { type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off' }));
+    formNode.appendChild(trap);
+
+    var button = make('button', { type: 'submit', class: 'button button--primary' }, t.confirm);
+    formNode.appendChild(button);
+    var status = make('div', { class: 'withdrawal-status', role: 'status', 'aria-live': 'polite' });
+    root.appendChild(formNode);
+    root.appendChild(status);
+
+    formNode.addEventListener('change', function () {
+      var some = formNode.querySelector('input[name="scope"]:checked').value === 'some';
+      itemsField.hidden = !some;
+      if (some) itemsInput.setAttribute('required', ''); else itemsInput.removeAttribute('required');
+    });
+
+    function showError() {
+      status.className = 'withdrawal-status is-error';
+      status.textContent = fill(t.error, { fallback: fallback });
+      button.disabled = false;
+      button.textContent = t.confirm;
+    }
+
+    formNode.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (!formNode.checkValidity()) {
+        formNode.reportValidity();
+        return;
+      }
+      var data = new FormData(formNode);
+      var body = new URLSearchParams();
+      data.forEach(function (value, key) { body.append(key, value); });
+      body.append('language', lang);
+      try { body.append('time_zone', Intl.DateTimeFormat().resolvedOptions().timeZone || ''); } catch (e) {}
+      body.append('page', window.location.href.split('?')[0]);
+      button.disabled = true;
+      button.textContent = t.sending;
+      status.textContent = '';
+      // No cookies: the declaration needs no login and must not depend on one.
+      fetch(endpoint, { method: 'POST', body: body, credentials: 'omit' })
+        .then(function (response) {
+          return response.json().then(function (json) { return { ok: response.ok, json: json }; });
+        })
+        .then(function (result) {
+          var answer = result.json && result.json.message;
+          if (!result.ok || !answer || !answer.ok) return showError();
+          var done = make('div', { class: 'withdrawal-done' });
+          done.appendChild(make('h2', {}, t.done_title));
+          done.appendChild(make('p', {}, fill(t.done, {
+            date: answer.received_at || '',
+            email: data.get('email'),
+            ref: answer.reference || ''
+          })));
+          if (answer.found === false) {
+            done.appendChild(make('p', { class: 'withdrawal-note' }, fill(t.not_found, {
+              order: data.get('order_reference'),
+              contact: answer.contact_email || fallback
+            })));
+          }
+          formNode.remove();
+          status.className = 'withdrawal-status';
+          status.textContent = '';
+          status.appendChild(done);
+          status.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        })
+        .catch(showError);
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Withdrawal form",
+  "settings": [
+    {
+      "type": "text",
+      "id": "endpoint",
+      "label": "ERPNext address",
+      "default": "https://erp.scarnatti.com/api/method/multichannel_core.returns.withdrawal.submit"
+    },
+    {
+      "type": "text",
+      "id": "fallback_email",
+      "label": "Email for withdrawals when the form cannot be sent",
+      "info": "Shown if ERPNext cannot be reached. A withdrawal by email is valid too."
+    }
+  ],
+  "presets": [{ "name": "Withdrawal form" }]
+}
+{% endschema %}

@@ -1,0 +1,25 @@
+{%- comment -%}
+  First step of the withdrawal function: a clearly visible button, on every page, leading to
+  the withdrawal page (page handle "vertrag-widerrufen", template page.withdrawal).
+  Render it in the footer: {% render 'withdrawal-button' %}
+  It must look like a button, not like the other legal links, and stay visible on phones.
+{%- endcomment -%}
+
+{%- assign lang = request.locale.iso_code | slice: 0, 2 | downcase -%}
+{%- assign withdrawal_page = pages['vertrag-widerrufen'] -%}
+{%- if withdrawal_page != empty and withdrawal_page.url != blank -%}
+  {%- assign withdrawal_url = withdrawal_page.url -%}
+{%- else -%}
+  {%- comment -%} root_url is "/" or "/nl": both become ".../pages/vertrag-widerrufen". {%- endcomment -%}
+  {%- assign withdrawal_url = routes.root_url | append: '/pages/vertrag-widerrufen' | replace: '//', '/' -%}
+{%- endif -%}
+
+<a href="{{ withdrawal_url }}" class="button button--secondary withdrawal-button">
+  {%- case lang -%}
+    {%- when 'de' -%}Vertrag widerrufen
+    {%- when 'nl' -%}Overeenkomst hier herroepen
+    {%- when 'fr' -%}Se rétracter du contrat ici
+    {%- when 'es' -%}Desistir del contrato aquí
+    {%- else -%}Withdraw from contract here
+  {%- endcase -%}
+</a>
