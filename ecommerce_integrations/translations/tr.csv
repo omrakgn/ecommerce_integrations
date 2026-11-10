@@ -20,3 +20,7 @@ Shows the last {0} declarations and every one that needs attention.,Son {0} beya
 Withdrawal Form App,Withdrawal Form Uygulaması
 The Shopify app with the withdrawal button. Its page in the Shopify admin lists the withdrawal declarations. Both values are on the app's settings page in the Shopify developer dashboard.,"Cayma düğmesini taşıyan Shopify uygulaması. Uygulamanın Shopify yönetimindeki sayfası cayma beyanlarını listeler. İki değer de Shopify geliştirici panelinde, uygulamanın ayarlar sayfasında."
 Checks that the page is opened by the Shopify admin of this store.,Sayfanın bu mağazanın Shopify yönetiminden açıldığını doğrular.
+Shopify events that failed,Başarısız Shopify olayları
+"An order, payment, shipment or refund from Shopify that ERPNext could not process in the last 7 days. Open the log, fix the cause, press Retry.","Son 7 günde Shopify'dan gelen ve ERPNext'in işleyemediği bir sipariş, ödeme, gönderi ya da iade. Kaydı açın, sebebi giderin, Retry'a basın."
+Shopify refunds without a refund payment,Para iadesi kaydı eksik Shopify iadeleri
+"Shopify refunded the money, but ERPNext has no refund payment for these credit notes. Each one has a comment saying why; record the payment by hand.",Shopify parayı iade etti ama ERPNext'te bu alacak dekontlarının ödeme kaydı yok. Her birinde nedenini yazan bir yorum var; ödemeyi elle kaydedin.

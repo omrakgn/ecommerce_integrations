@@ -162,7 +162,7 @@ def unpaid_credit_notes(days=RETRY_DAYS, limit=50) -> list:
 	"""
 	return frappe.db.sql(
 		f"""
-		select si.name, si.{REFUND_ID_FIELD} as refund_id,
+		select si.name, si.posting_date, si.{REFUND_ID_FIELD} as refund_id,
 			coalesce(nullif(si.{ORDER_ID_FIELD}, ''), orig.{ORDER_ID_FIELD}) as order_id
 		from `tabSales Invoice` si
 		left join `tabSales Invoice` orig on orig.name = si.return_against

@@ -153,6 +153,10 @@ shipment_label_created = ["ecommerce_integrations.shopify.tracking.push_tracking
 # olayını gönderen kimse yoktu.
 shipment_delivered = ["ecommerce_integrations.shopify.tracking.push_delivery_on_delivered"]
 
+# Operations board of multichannel_core (/app/operations-board): Shopify's cards. Called only by
+# that board; without multichannel_core nothing reads this list. See shopify/operations.py.
+operations_board_sources = ["ecommerce_integrations.shopify.operations.cards"]
+
 scheduler_events = {
 	"all": ["ecommerce_integrations.shopify.inventory.update_inventory_on_shopify"],
 	"daily": [
