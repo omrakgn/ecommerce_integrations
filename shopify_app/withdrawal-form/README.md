@@ -45,6 +45,18 @@ Denetim (yayından önce, isteğe bağlı):
 2. Mağazanın `...myshopify.com` adresini girin, **Generate link**.
 3. Bağlantıyı mağaza sahibi hesabıyla Shopify'a girmiş tarayıcıda açın, **Install**.
 
+**Uygulama uzantı yayınlanmadan kurulduysa yeniden kurun.** 2026-11-10'da uygulama, dev.shopify.com'da
+oluşturulurken açılan uzantısız 1. sürümle kuruldu. `withdrawal-form-2` "New version released to
+users" ile etkin olduğu halde tema düzenleyicide App embeds'te ve Add block'ta görünmedi.
+Kaldırıp (Settings > Apps and sales channels > Withdrawal Form > Uninstall) aynı bağlantıyla
+yeniden kurunca geldi. Yeni kurulum yalnız bugünkü sürümün izinleriyle yapılır (hiç izin yok);
+ilk kurulumun müşteri verisi izinleri de böylece düştü.
+
+**IP allowlist kurulmadı (bilerek).** Shopify yönetiminde "Enforced IP restrictions" satırı
+görülebilir: uygulamanın Admin API erişimini belirli sunuculara sınırlayan ayar. Yalnız App
+Store'daki uygulamalara zorunlu; bu uygulama Shopify API'sine hiç bağlanmıyor, sınırlanacak bir
+erişimi yok.
+
 ## Tema düzenleyicide (her tema için)
 
 Uygulamayı Shopify yönetiminde açınca "Find this app in the pages where you work" yazar: normal.
@@ -63,11 +75,6 @@ Uygulamanın kendi ekranı yok, her şeyi tema düzenleyicide.
      bir simge (2026-11-10).
 5. Önizlemede deneyin (Yapılacaklar 33'teki liste), sonra kopyayı yayınlayın.
 6. Händlerbund düğmesini kapatın; sitede tek düğme kalmalı.
-
-**İzinler:** ilk kurulum, uygulama dev.shopify.com'da oluşturulurken seçilen izinlerle (müşteri
-verisi okuma, tema yazma) yapıldı; bugünkü sürüm hiçbir izin istemiyor. Gereksiz izin kalmasın diye
-uygulama bir kez kaldırılıp aynı kurulum bağlantısıyla yeniden kurulmalı; kurulum ekranı izin
-istememeli.
 
 **Tema değişince:** yeni temada 3. ve 4. adım tekrarlanır (tıklama, kod yok). Yeni tema yayınlanmadan
 önce düğmeye ve formdan bir deneme beyanına bakılır.
