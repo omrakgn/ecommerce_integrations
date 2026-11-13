@@ -86,6 +86,18 @@ hep önce yayın, sonra kurulum.
 **Uygulama değişince tema ayarları taşınmaz.** Bloğun ve gömmenin ayarları (düğme yazısı, renkler,
 yedek e-posta) uygulamaya bağlı. Yeni uygulamada tema düzenleyicide yeniden açılır ve girilir.
 
+## Simge (2026-11-13)
+
+Shopify yönetiminde uygulama listesinde ve sol menüde görünen simge: belge ve köşesinde turuncu
+"geri" rozeti (sözleşmeden cayma). Markadan bağımsız; firma logosu yok.
+
+- `app-icon/icon-1200.png`: Shopify'a yüklenen dosya. 1200 x 1200 PNG, köşeleri düz; çizim 697 x 877
+  px, kenar boşluğu en az 161 px (Shopify: en az 75 px, çizim 750 ile 900 px arası).
+- `app-icon/icon.svg`: kaynak. Değişirse PNG yeniden üretilir (tarayıcıda 1200 x 1200 açıp ekran
+  görüntüsü). Renkler: zemin `#1E3A5F`, rozet `#F2A541`, belge çizgileri `#B9C9DE`.
+- **Yükleme CLI ile değil, elle:** mağazanın Dev Dashboard'u > Withdrawal Form > **Settings** > App
+  icon. Shopify sol menüde simgeyi küçültüp kendisi çiziyor (20 px).
+
 ## Shopify yönetimindeki sayfa: cayma beyanları (2026-11-10)
 
 Uygulamayı Shopify yönetiminde (Apps > Withdrawal Form) açınca cayma beyanlarının listesi

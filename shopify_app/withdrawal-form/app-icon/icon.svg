@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <!-- Withdrawal Form app icon: a contract sheet with a return badge.
+       Shopify: 1200 x 1200 PNG, square corners, 75 px clear margin, artwork 750 to 900 px. -->
+  <rect width="1200" height="1200" fill="#1E3A5F"/>
+  <g transform="translate(600 600) scale(1.06) translate(-658 -613)">
+    <path d="M330 200 H690 L840 350 V960 H330 Z" fill="#FFFFFF"/>
+    <path d="M690 200 V350 H840 Z" fill="#B9C9DE"/>
+    <rect x="410" y="430" width="330" height="40" rx="20" fill="#B9C9DE"/>
+    <rect x="410" y="520" width="330" height="40" rx="20" fill="#B9C9DE"/>
+    <rect x="410" y="610" width="220" height="40" rx="20" fill="#B9C9DE"/>
+    <circle cx="790" cy="830" r="215" fill="#F2A541" stroke="#1E3A5F" stroke-width="36"/>
+    <path d="M875 925 V855 A85 85 0 0 0 790 770 H705" fill="none" stroke="#1E3A5F" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M720 700 L625 770 L720 840 Z" fill="#1E3A5F" stroke="#1E3A5F" stroke-width="20" stroke-linejoin="round"/>
+  </g>
+</svg>
