@@ -5,9 +5,11 @@ yönetiminde beyanları listeleyen bir sayfası var. Mağaza verisine hiçbir ye
 gönderdiği beyanı ERPNext işliyor (`multichannel_core.returns.withdrawal.submit`), yönetimdeki
 sayfayı da ERPNext sunuyor (bkz. hub'da `docs/cayma-butonu.md`).
 
-- **Tür:** kendi sunucusu olmayan uygulama (tema uzantısı + ERPNext'in sunduğu sayfa), tek mağazaya
-  özel dağıtımla kurulur; App Store'da yok.
-- **Sahibi:** dev.shopify.com'daki hesap. Client ID `shopify.app.toml`'da.
+- **Tür:** kendi sunucusu olmayan uygulama (tema uzantısı + ERPNext'in sunduğu sayfa); App Store'da
+  yok.
+- **Sahibi:** mağazanın kendi organizasyonu, yani mağazanın Dev Dashboard'u (2026-11-13'ten beri).
+  Mağazaya oradaki "Installs" kartından kurulur; dağıtım adımı ve IP allowlist yok. Client ID
+  `shopify.app.toml`'da.
 - **Tema kodu sürümü** (`../../shopify_theme/withdrawal/`) yedek olarak duruyor; ikisinden yalnız biri
   kullanılır. Yedek eski düzende (düğme bir sayfaya gider, form o sayfada); bilerek güncellenmedi.
 
@@ -49,7 +51,10 @@ cd "C:\Users\omera\Desktop\ErpNext_Bulk_App\Erpnext Ecommerce Integration\ecomme
 shopify app deploy
 ```
 
-- İlk seferde tarayıcıda dev.shopify.com girişi açılır; uygulamanın sahibi olan hesapla girin.
+- İlk seferde tarayıcıda Shopify girişi açılır; mağaza sahibi hesabıyla (ya da mağazada **App
+  developer** rolü olan bir hesapla) girin. Organizasyon sorulursa mağazanın organizasyonu.
+- CLI başka bir ayar dosyasını ya da eski uygulamayı hatırlıyorsa: `shopify app config use
+  shopify.app.toml`. Başka bir hesapla girilmişse önce `shopify auth logout`.
 - "Release a new version?" sorusuna **Yes**.
 - Yayın bitince depoda değişen dosya olursa (CLI uzantıya kimlik yazabilir) commit edin.
 
@@ -58,21 +63,28 @@ Denetim (yayından önce, isteğe bağlı):
 
 ## Kurulum (bir kez)
 
-1. dev.shopify.com > uygulama > **Distribution** > **Custom distribution**.
-2. Mağazanın `...myshopify.com` adresini girin, **Generate link**.
-3. Bağlantıyı mağaza sahibi hesabıyla Shopify'a girmiş tarayıcıda açın, **Install**.
+Önce `shopify app deploy` (kurulacak bir sürüm olmalı), sonra:
 
-**Uygulama uzantı yayınlanmadan kurulduysa yeniden kurun.** 2026-11-10'da uygulama, dev.shopify.com'da
+1. Mağazanın Shopify yönetiminde (bilgisayardan) **Settings > Apps > Develop apps > Build apps in
+   Dev Dashboard**. dev.shopify.com mağazanın organizasyonunda açılır; sol üstteki ad bunu söyler.
+2. **Apps > Withdrawal Form > Installs** kartında **Install app**, mağazayı seçin, onaylayın.
+
+**Neden mağazanın kendi organizasyonunda (2026-11-13).** Uygulama önce başka bir organizasyonda
+açılmış ve mağazaya özel dağıtım bağlantısıyla kurulmuştu (Client ID `f31e2cb3…`). Shopify,
+kendi organizasyonu dışındaki bir mağazaya kurulan özel uygulamadan IP allowlist istiyor: yeni
+kurulumlarda 20 Kasım 2026'dan, kurulu olanlarda 1 Ocak 2027'den itibaren. Mağazanın kendi
+organizasyonundaki uygulamada bu yok ve "Distribution" kartı hiç çıkmıyor; kurulum "Installs"
+kartından. Yeni uygulama aynı klasörden `shopify app config link` ile açıldı (yeni Client ID);
+eski uygulama mağazadan kaldırılır, eski organizasyondan silinir.
+
+**Uygulama uzantı yayınlanmadan kurulduysa yeniden kurun.** 2026-11-10'da ilk uygulama,
 oluşturulurken açılan uzantısız 1. sürümle kuruldu. `withdrawal-form-2` "New version released to
 users" ile etkin olduğu halde tema düzenleyicide App embeds'te ve Add block'ta görünmedi.
-Kaldırıp (Settings > Apps and sales channels > Withdrawal Form > Uninstall) aynı bağlantıyla
-yeniden kurunca geldi. Yeni kurulum yalnız bugünkü sürümün izinleriyle yapılır (hiç izin yok);
-ilk kurulumun müşteri verisi izinleri de böylece düştü.
+Kaldırıp (Settings > Apps > Withdrawal Form > Uninstall) yeniden kurunca geldi. Bu yüzden sıra
+hep önce yayın, sonra kurulum.
 
-**IP allowlist kurulmadı (bilerek).** Shopify yönetiminde "Enforced IP restrictions" satırı
-görülebilir: uygulamanın Admin API erişimini belirli sunuculara sınırlayan ayar. Yalnız App
-Store'daki uygulamalara zorunlu; bu uygulama Shopify API'sine hiç bağlanmıyor, sınırlanacak bir
-erişimi yok.
+**Uygulama değişince tema ayarları taşınmaz.** Bloğun ve gömmenin ayarları (düğme yazısı, renkler,
+yedek e-posta) uygulamaya bağlı. Yeni uygulamada tema düzenleyicide yeniden açılır ve girilir.
 
 ## Shopify yönetimindeki sayfa: cayma beyanları (2026-11-10)
 
@@ -90,7 +102,8 @@ görünür. Sayfayı ERPNext sunar (`application_url`,
   zamanı (en çok 10 dakika) ve mağazayı kontrol ediyor; biri tutmazsa liste gösterilmiyor.
   Sayfayı yalnız Shopify yönetimi çerçeve içinde açabiliyor.
 - **Ayar (bir kez):** ERPNext > Shopify Setting > **Withdrawal Form App**: Client ID (bu dosyadaki
-  `client_id`) ve **Client Secret** (dev.shopify.com > Withdrawal Form > Settings). Secret yalnız
+  `client_id`) ve **Client Secret** (mağazanın Dev Dashboard'u > Withdrawal Form > Settings). Uygulama
+  değişince ikisi de değişir. Secret yalnız
   ERPNext'e girilir; kimseyle paylaşılmaz, depoya yazılmaz. Eksikse sayfa "not set up" der.
 - **Yayın:** `application_url` değişti; bir kez `shopify app deploy`.
 - **Dil:** Shopify yönetimi Türkçeyse sayfa Türkçe, değilse İngilizce.

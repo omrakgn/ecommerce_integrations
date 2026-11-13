@@ -1,25 +1,26 @@
-# Withdrawal Form: a Shopify app without a server of its own, installed on one store by custom
-# distribution. It asks for no access to store data. It adds theme blocks (the
-# "Vertrag widerrufen" button and form); the form posts to ERPNext. Its page in the
+# Withdrawal Form: a Shopify app without a server of its own. It belongs to the store's own
+# organization (the store's Dev Dashboard) and is installed from the app's Installs card there:
+# no custom distribution, so no IP allowlist. It asks for no access to store data. It adds theme
+# blocks (the "Vertrag widerrufen" button and form); the form posts to ERPNext. Its page in the
 # Shopify admin (application_url) is served by ERPNext too and lists the declarations:
 # ecommerce_integrations/shopify/withdrawal_app.py.
 # Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "f31e2cb3a14ad23d5b776ae47199009c"
+client_id = "25e8840011e7bad3e2fc7951ee2e87f9"
 name = "Withdrawal Form"
 application_url = "https://erp.scarnatti.com/api/method/ecommerce_integrations.shopify.withdrawal_app.page"
 embedded = true
 
 [build]
+include_config_on_deploy = true
+# The app page is ERPNext's; "shopify app dev" must not replace it with a tunnel address.
+automatically_update_urls_on_dev = false
 
 [webhooks]
-api_version = "2025-10"
+api_version = "2027-01"
 
 [access_scopes]
 scopes = ""
 
 [auth]
 redirect_urls = ["https://shopify.dev/apps/default-app-home/api/auth"]
-
-[pos]
-embedded = false
